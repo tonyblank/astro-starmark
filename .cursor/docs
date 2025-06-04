@@ -1,4 +1,4 @@
-# Astro Docs Feedback Plugin - Technical Specifications
+# Astro StarMark - Technical Specifications
 
 ## Core Features Implementation
 
@@ -167,11 +167,11 @@ describe('Feedback Submission', () => {
 });
 ```
 
-### E2E Test Patterns (docs-site as Test Environment)
+### E2E Test Patterns (starmark.dev as Test Environment)
 ```typescript
-// User workflow tests against docs-site
+// User workflow tests against starmark.dev
 test('user can highlight text and submit feedback', async ({ page }) => {
-  await page.goto('http://localhost:4321/docs/getting-started');
+  await page.goto('http://localhost:4321/getting-started');
   await page.waitForLoadState('networkidle');
   
   // Test text selection
@@ -190,19 +190,19 @@ test('user can highlight text and submit feedback', async ({ page }) => {
 
 ## Configuration & Plugin Options
 
-### Integration Setup (Updated for docs-site)
+### Integration Setup (Updated for starmark.dev)
 ```typescript
-// astro.config.mjs (docs-site)
+// astro.config.mjs (starmark.dev)
 export default defineConfig({
   integrations: [
     starlight({
-      title: 'Astro Docs Feedback Plugin',
+      title: 'Astro StarMark',
       plugins: [
-        docsFeedback({
+        starmark({
           // Storage configuration
           linear: {
             apiKey: process.env.LINEAR_API_KEY,
-            teamId: 'team_123',
+            teamId: '0c581c9a-750a-4bfe-bec3-c7021606c674',
             projectId: 'project_456' // optional
           },
           astroDb: true,
@@ -221,9 +221,9 @@ export default defineConfig({
           // Authentication (Auth0 free plan)
           auth: {
             provider: 'auth0',
-            domain: 'dev-example.auth0.com',
+            domain: 'your-tenant.auth0.com',
             clientId: process.env.AUTH0_CLIENT_ID,
-            audience: 'https://api.example.com'
+            audience: 'https://api.starmark.dev'
           },
           
           // Behavior
@@ -299,7 +299,7 @@ const FeedbackSchema = z.object({
 
 ### Package Structure (ESM-only for 2025)
 ```
-astro-docs-feedback/
+starmark-integration/
 ├── dist/                    # Compiled JavaScript (ESM only)
 ├── src/                     # TypeScript source
 ├── types/                   # TypeScript declarations
@@ -314,7 +314,7 @@ astro-docs-feedback/
 ### npm Package Configuration (Modern)
 ```json
 {
-  "name": "astro-docs-feedback",
+  "name": "@starmark/integration",
   "type": "module",
   "exports": {
     ".": "./dist/index.js",
@@ -350,17 +350,18 @@ astro-docs-feedback/
 - Performance budgets met (Core Web Vitals)
 - Security vulnerabilities resolved (Snyk)
 
-## Development Environment (docs-site Integration)
+## Development Environment (starmark.dev Integration)
 
-### Dual-Purpose docs-site
-- **Documentation**: Complete plugin documentation and examples
-- **Test Environment**: Real-world testing with actual Starlight integration
+### Dual-Purpose starmark.dev
+- **Marketing**: Complete StarMark marketing site and examples
+- **Documentation**: Complete plugin documentation and usage guides
+- **Dogfooding**: Real-world testing with actual Starlight integration using StarMark itself
 - **Auth0 Integration**: Live authentication testing with free plan
 - **Performance Testing**: Real Core Web Vitals measurements
 - **Accessibility Testing**: Real screen reader and keyboard testing
 
 ### Development URLs
-- **Docs Site**: http://localhost:4321
+- **StarMark Site**: http://localhost:4321 (starmark.dev locally)
 - **Storybook**: http://localhost:6006
 - **Vitest UI**: http://localhost:51204
 - **Playwright Report**: http://localhost:9323
@@ -378,11 +379,11 @@ astro-docs-feedback/
       "inputs": ["src/**", "tests/**", "stories/**"]
     },
     "test:e2e": {
-      "dependsOn": ["docs-site#build"],
+      "dependsOn": ["starmark.dev#build"],
       "inputs": ["tests/**"]
     }
   }
 }
 ```
 
-This technical specification reflects the modern 2025 development practices and the dual-purpose docs-site approach for comprehensive testing and documentation. 
+This technical specification reflects the modern 2025 development practices and the dual-purpose starmark.dev approach for comprehensive marketing, documentation, and dogfooding. 

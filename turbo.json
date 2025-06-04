@@ -1,0 +1,50 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "pipeline": {
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**", ".astro/**"]
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true
+    },
+    "test": {
+      "dependsOn": ["build"],
+      "inputs": ["src/**", "tests/**"]
+    },
+    "test:unit": {
+      "inputs": ["src/**", "tests/**"]
+    },
+    "test:component": {
+      "inputs": ["src/**", "tests/**"]
+    },
+    "test:integration": {
+      "dependsOn": ["build"],
+      "inputs": ["src/**", "tests/**"]
+    },
+    "test:e2e": {
+      "dependsOn": ["build"],
+      "inputs": ["src/**", "tests/**", "e2e/**"]
+    },
+    "lint": {
+      "inputs": ["src/**", "*.config.*"]
+    },
+    "lint:fix": {
+      "inputs": ["src/**", "*.config.*"]
+    },
+    "format": {
+      "inputs": ["src/**", "*.config.*", "*.md"]
+    },
+    "format:check": {
+      "inputs": ["src/**", "*.config.*", "*.md"]
+    },
+    "type-check": {
+      "dependsOn": ["^build"],
+      "inputs": ["src/**", "*.config.*"]
+    },
+    "clean": {
+      "cache": false
+    }
+  }
+} 

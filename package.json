@@ -1,0 +1,49 @@
+{
+  "name": "starmark",
+  "version": "0.0.0",
+  "description": "Astro StarMark - Feedback collection plugin for documentation sites with Linear, GitHub, and Auth0 integration",
+  "license": "MIT",
+  "type": "module",
+  "private": true,
+  "engines": {
+    "node": ">=18.0.0",
+    "pnpm": ">=8.0.0"
+  },
+  "packageManager": "pnpm@8.15.1",
+  "scripts": {
+    "build": "turbo build",
+    "dev": "turbo dev",
+    "test": "turbo test",
+    "test:unit": "turbo test:unit",
+    "test:component": "turbo test:component", 
+    "test:integration": "turbo test:integration",
+    "test:e2e": "turbo test:e2e",
+    "test:watch": "turbo test:unit --watch",
+    "test:ci": "turbo test --coverage --reporter=verbose",
+    "lint": "turbo lint",
+    "lint:fix": "turbo lint:fix",
+    "format": "turbo format",
+    "format:check": "turbo format:check",
+    "type-check": "turbo type-check",
+    "clean": "turbo clean",
+    "changeset": "changeset",
+    "changeset:version": "changeset version",
+    "changeset:publish": "changeset publish",
+    "audit": "pnpm audit --audit-level moderate",
+    "ci-check": "echo '🧪 Running FULL CI checks (this will take a while)...' && pnpm type-check && pnpm lint && pnpm format:check && pnpm build && pnpm test && echo '🔒 Running security audit...' && pnpm audit --audit-level high && cd starmark-integration && pnpm audit --audit-level moderate && cd .. && echo '🎭 Installing Playwright browsers...' && pnpm --filter starmark.dev exec playwright install --with-deps && echo '🧪 Running E2E tests...' && pnpm test:e2e && echo '✅ All CI checks passed!'",
+    "ci-check-quick": "echo '🧪 Running quick CI checks...' && pnpm type-check && pnpm lint && pnpm format:check && pnpm build && echo '✅ Quick checks passed!'"
+  },
+  "devDependencies": {
+    "@changesets/cli": "^2.27.1",
+    "turbo": "^1.12.4"
+  },
+  "workspaces": [
+    "starmark-integration",
+    "starmark.dev"
+  ],
+  "pnpm": {
+    "overrides": {
+      "esbuild": ">=0.25.0"
+    }
+  }
+} 

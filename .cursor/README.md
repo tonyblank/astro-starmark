@@ -1,6 +1,6 @@
 # .cursor Folder - AI Development Context
 
-This folder contains context files that help Cursor and AI assistants understand the project better. These files provide comprehensive information about the project's goals, architecture, and development practices.
+This folder contains context files that help Cursor and AI assistants understand the StarMark project better. These files provide comprehensive information about the project's goals, architecture, and development practices.
 
 ## Files Overview
 
@@ -28,8 +28,8 @@ These files serve multiple purposes:
 ## Project Architecture Summary
 
 - **Monorepo**: PNPM workspaces + Turborepo for build orchestration
-- **Core Package**: `astro-docs-feedback/` - The main plugin
-- **Test Environment**: `docs-site/` - Starlight documentation site that doubles as testing environment
+- **Core Package**: `starmark-integration/` - The main Astro StarMark plugin
+- **Marketing & Docs Site**: `starmark.dev/` - starmark.dev marketing and documentation site that also uses StarMark for feedback (dogfooding)
 - **Testing Stack**: Vitest + Playwright + MSW v2 + Testing Library (2025 modern stack)
 - **TDD Approach**: Strict test-first development with 90%+ coverage requirements
 
@@ -46,7 +46,7 @@ These files serve multiple purposes:
 ```bash
 # Development
 pnpm install              # Install all dependencies
-pnpm --filter docs-site dev    # Start docs site (test environment)
+pnpm --filter starmark.dev dev    # Start starmark.dev site (marketing + docs + dogfooding)
 
 # Testing
 pnpm test                 # Run all tests
@@ -61,10 +61,10 @@ pnpm build               # Build all packages
 
 - All milestones use test-first development
 - Each feature branch requires AI agent approval before merge
-- The docs-site serves dual purpose: documentation + test environment
+- The starmark.dev site serves triple purpose: marketing + documentation + dogfooding environment
 - Modern 2025 testing stack with streamlined tooling
 - Comprehensive accessibility and performance requirements
 
 ---
 
-*This folder structure is designed to provide maximum context to AI assistants while maintaining clear separation of concerns and comprehensive project documentation.* 
+*This folder structure is designed to provide maximum context to AI assistants while maintaining clear separation of concerns and comprehensive project documentation for Astro StarMark.* 

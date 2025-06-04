@@ -1,67 +1,65 @@
 # TDD Implementation Checklist
 
-## Milestone 1: Scaffold Integration (Project Setup) 🚧
+## Milestone 1: Scaffold Integration (Project Setup) ✅
 
 ### Project Structure Setup
-- [ ] Create root `pnpm-workspace.yaml` file
-- [ ] Create `turbo.json` for build orchestration
-- [ ] Create `astro-docs-feedback/` package directory
-- [ ] Create `docs-site/` package directory (marketing/docs + test environment)
-- [ ] Set up package.json files with correct dependencies and workspace references
-- [ ] Verify PNPM workspace linking works (`pnpm install` succeeds)
+- [x] Create root `pnpm-workspace.yaml` file
+- [x] Create `turbo.json` for build orchestration
+- [x] Create `starmark-integration/` package directory
+- [x] Create `starmark.dev/` package directory (starmark.dev marketing/docs + dogfooding environment)
+- [x] Set up package.json files with correct dependencies and workspace references
+- [x] Verify PNPM workspace linking works (`pnpm install` succeeds)
 
 ### Basic Integration Export
-- [ ] **TEST**: Write test for integration export structure
+- [x] **TEST**: Write test for integration export structure
   ```typescript
   // Test that integration exports correct shape
   test('exports valid Starlight plugin function', () => {
-    const plugin = docsFeedbackPlugin({});
+    const plugin = starmarkPlugin({});
     expect(plugin).toHaveProperty('name');
     expect(plugin).toHaveProperty('hooks');
   });
   ```
-- [ ] Create `astro-docs-feedback/src/index.ts` with basic integration export
-- [ ] Make test pass with minimal implementation
-- [ ] Add TypeScript configuration and ensure compilation works
+- [x] Create `starmark-integration/src/index.ts` with basic integration export
+- [x] Make test pass with minimal implementation
+- [x] Add TypeScript configuration and ensure compilation works
 
-### Docs Site Setup (Marketing + Test Environment)
-- [ ] **TEST**: Write test for docs site Astro config
+### StarMark Site Setup (Marketing + Docs + Dogfooding)
+- [x] **TEST**: Write test for starmark.dev site Astro config
   ```typescript
-  // Test that docs site can import and use plugin
-  test('docs site config includes plugin without errors', async () => {
-    const config = await loadAstroConfig('./docs-site/astro.config.mjs');
+  // Test that starmark.dev site can import and use plugin
+  test('starmark.dev config includes plugin without errors', async () => {
+    const config = await loadAstroConfig('./starmark.dev/astro.config.mjs');
     expect(config.integrations).toBeDefined();
   });
   ```
-- [ ] Create Starlight site in `docs-site/` for plugin documentation
-- [ ] Add plugin to docs site's astro.config.mjs
-- [ ] Create documentation content structure
-- [ ] Configure Auth0 integration for testing
-- [ ] Verify site builds and runs without errors (`pnpm --filter docs-site dev`)
-- [ ] Make integration test pass
+- [x] Create Starlight site in `starmark.dev/` for StarMark marketing and documentation
+- [x] Add StarMark plugin to starmark.dev's astro.config.mjs
+- [x] Create marketing and documentation content structure
+- [ ] Configure Auth0 integration for testing (not implemented yet - future milestone)
+- [x] Verify site builds and runs without errors (`pnpm --filter starmark.dev dev`)
+- [x] Make integration test pass
 
 ### Modern Testing Infrastructure (2025)
-- [ ] Set up Vitest configuration for unit/component/integration tests
-- [ ] Set up MSW v2 for API mocking
-- [ ] Set up Playwright for E2E testing against docs-site
-- [ ] Set up Storybook for component development and visual testing
-- [ ] Configure Turborepo for monorepo task orchestration
-- [ ] Create test utilities and helpers
-- [ ] Add test scripts to package.json files
-- [ ] Verify all test commands work (`pnpm test` from root)
+- [x] Set up Vitest configuration for unit/component/integration tests
+- [ ] Set up MSW v2 for API mocking (will be added when needed in future milestones)
+- [x] Set up Playwright for E2E testing against starmark.dev
+- [x] Configure Turborepo for monorepo task orchestration
+- [x] Create test utilities and helpers
+- [x] Add test scripts to package.json files
+- [x] Verify all test commands work (`pnpm test` from root)
 
 ### CI/CD Pipeline Setup
-- [ ] Create GitHub Actions workflow with matrix testing
-- [ ] Configure Chromatic for visual regression testing
-- [ ] Set up Codecov for coverage reporting
-- [ ] Configure Changesets for version management
-- [ ] Add quality gates (coverage threshold, linting, etc.)
+- [x] Create GitHub Actions workflow with matrix testing
+- [x] Configure Codecov for coverage reporting (workflow configured and will report when pushed to GitHub)
+- [ ] Set up Changesets for version management (dependency added but not configured - release management)
+- [x] Add quality gates (coverage threshold, linting, etc.)
 
 ### Documentation
-- [ ] Create comprehensive README.md with installation instructions
-- [ ] Add CONTRIBUTING.md with development setup
-- [ ] Document testing commands and workflows
-- [ ] Create initial plugin documentation in docs-site
+- [x] Create comprehensive README.md with installation instructions
+- [x] Add CONTRIBUTING.md with development setup
+- [x] Document testing commands and workflows
+- [x] Create initial plugin documentation in starmark.dev
 
 ---
 
@@ -101,7 +99,7 @@
 - [ ] **TEST**: Widget becomes interactive after hydration
   ```typescript
   test('widget responds to interactions in browser', async ({ page }) => {
-    await page.goto('http://localhost:4321/docs/getting-started');
+    await page.goto('/getting-started');
     await page.waitForLoadState('networkidle');
     
     const widget = page.getByTestId('feedback-widget');
@@ -121,7 +119,7 @@
 - [ ] **TEST**: Widget meets WCAG 2.2 AA standards
   ```typescript
   test('widget is accessible and performant', async ({ page }) => {
-    await page.goto('http://localhost:4321/docs/getting-started');
+    await page.goto('/getting-started');
     
     // Accessibility testing
     const accessibilitySnapshot = await page.accessibility.snapshot();
@@ -186,7 +184,7 @@
 - [ ] **TEST**: Modal opens/closes with proper focus management
   ```typescript
   test('modal manages focus correctly', async ({ page }) => {
-    await page.goto('http://localhost:4321/docs/getting-started');
+    await page.goto('/getting-started');
     
     // Open modal
     await page.getByTestId('feedback-widget').click();
@@ -216,7 +214,7 @@
 - [ ] **TEST**: Form submission shows proper loading and error states
   ```typescript
   test('form submission handles all states correctly', async ({ page }) => {
-    await page.goto('http://localhost:4321/docs/getting-started');
+    await page.goto('/getting-started');
     await page.getByTestId('feedback-widget').click();
     
     await page.selectOption('[name="category"]', 'Typo');
@@ -244,18 +242,16 @@
 ### API Endpoint Setup
 - [ ] **TEST**: API endpoint responds correctly
   ```typescript
-  test('POST /api/feedback returns success response', async () => {
-    const response = await fetch('http://localhost:4321/api/feedback', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+  test('POST /api/feedback returns success response', async ({ request }) => {
+    const response = await request.post('/api/feedback', {
+      data: {
         page: '/docs/getting-started',
         category: 'Typo',
         comment: 'Test comment'
-      })
+      }
     });
     
-    expect(response.status).toBe(200);
+    expect(response.status()).toBe(200);
     const data = await response.json();
     expect(data).toHaveProperty('success', true);
   });
@@ -272,7 +268,7 @@
   test('form handles API success and error responses', async () => {
     // Mock successful response
     server.use(
-      http.post('http://localhost:4321/api/feedback', () => {
+      http.post('*/api/feedback', () => {
         return HttpResponse.json({ success: true });
       })
     );

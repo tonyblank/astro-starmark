@@ -385,4 +385,154 @@ interface AuthProvider {
 - Security vulnerabilities resolved
 - AI agent code review approval
 
-Remember: Every feature starts with a failing test. Every bug fix starts with a test that reproduces the issue. No exceptions. 
+Remember: Every feature starts with a failing test. Every bug fix starts with a test that reproduces the issue. No exceptions.
+
+## Core Development Rules
+
+### Work Tracking & Documentation
+- **ALWAYS update .cursor/context with milestone progress and work summaries**
+- **NEVER create additional markdown files for project tracking - use .cursor/ folder only**
+- Document all completed work with:
+  - Files created/modified
+  - Technical achievements
+  - Key design decisions
+  - Known issues to address in next session
+- Update milestone status with ✅ when complete, 🚧 when in progress
+- Add work summary section at the end of each completed milestone
+
+### Code Quality & Testing
+- Follow TDD approach: write tests first, then implement
+- All builds must pass before considering milestone complete
+- Maintain comprehensive test coverage (aim for >90%)
+- Use modern tooling: Vitest, Playwright, MSW v2, TypeScript strict mode
+- Implement graceful error handling that doesn't break builds
+
+### Project Structure
+- Use monorepo with PNPM workspaces + Turborepo
+- Keep packages isolated with proper peer dependencies
+- Follow ESM-first approach with proper TypeScript exports
+- Use Zod for runtime validation with graceful degradation
+
+### Communication & AI Assistance
+- Always explain what each tool call accomplishes
+- Run parallel tool calls for maximum efficiency
+- Update context before ending sessions
+- Ask clarifying questions if requirements are unclear
+- Maintain detailed progress tracking in .cursor/context
+
+## AI Tool Usage Guidelines
+
+### Tool Call Efficiency
+- **ALWAYS run parallel tool calls when possible** (e.g., reading multiple files, running independent commands)
+- Prioritize parallel execution over sequential operations
+- Use parallel calls for read-only operations like file reading, grep searches, codebase searches
+- Group related operations together in single calls when beneficial
+
+### File Operations
+- Use `edit_file` for all code changes instead of outputting code to user
+- Make all edits to a file in a single `edit_file` call rather than multiple calls
+- Use `// ... existing code ...` to represent unchanged sections
+- Provide clear instructions describing the edit purpose
+
+### Code Implementation
+- Ensure generated code can run immediately without additional steps
+- Add all necessary imports, dependencies, and configuration
+- Create appropriate dependency management files (package.json, requirements.txt)
+- For web apps, implement modern UI with good UX practices
+- Never generate extremely long hashes or binary content
+- Fix linter errors if clear how to, but don't loop more than 3 times on same file
+
+### Error Handling
+- If suggested code_edit isn't followed properly, try reapplying the edit
+- Don't make uneducated guesses about fixes
+- Stop and ask user for guidance after 3 failed attempts at same issue
+
+## Project-Specific Rules
+
+### StarMark Development
+- Always maintain the StarMark integration as dogfooding example in starmark.dev
+- Keep integration gracefully failing - never break builds
+- Test integration loads without errors as primary success criteria
+- Use Starlight for documentation with proper sidebar navigation
+- Follow the milestone checklist in .cursor/context strictly
+
+### Testing Requirements
+- Unit tests: Vitest with globals, ESM modules
+- Component tests: Vitest + Testing Library for Astro components
+- Integration tests: Vitest + MSW v2 for API mocking
+- E2E tests: Playwright with modern selectors and auto-waiting
+- All tests must be isolated and not depend on external services
+
+### Build System
+- Use Turborepo for build orchestration
+- Configure proper caching and dependency management
+- Support Node.js 18+ with modern ESM
+- Generate TypeScript declarations for all packages
+- Use tsup for library builds, Astro for site builds
+
+## Modern Stack Conventions
+
+### TypeScript Configuration
+- Use strict mode with all type checking enabled
+- Target ES2022 with modern module resolution
+- Generate source maps and declaration files
+- Use proper module bundling (bundler resolution)
+
+### Package Management
+- Use PNPM workspaces for monorepo structure
+- Specify exact peer dependencies
+- Use workspace:* for internal package references
+- Include proper files field in package.json
+
+### CI/CD Pipeline
+- Test across Node.js 18, 20, 22
+- Test on Ubuntu, Windows, macOS
+- Include security audits and dependency checks
+- Upload test artifacts and coverage reports
+- Use matrix strategy for comprehensive testing
+
+### Code Style
+- Use Prettier for formatting with modern options
+- ESLint with TypeScript and Astro plugins
+- Follow semantic versioning with changesets
+- Use conventional commits for clear history
+
+## Error Recovery Patterns
+
+### Common Issues
+- Missing browser installations for Playwright (run `playwright install`)
+- TypeScript config errors (check extends paths and types)
+- Build cache issues (clear with `pnpm clean`)
+- Dependency resolution (ensure proper peer deps)
+
+### Debugging Steps
+1. Check linter errors for obvious fixes
+2. Verify all dependencies are installed
+3. Clear build caches if builds fail mysteriously
+4. Check TypeScript config paths and extends
+5. Ensure proper ESM imports/exports
+
+### When to Ask for Help
+- After 3 failed attempts at same fix
+- When requirements are ambiguous
+- When user needs to make architectural decisions
+- When external services or credentials are needed
+
+## Session Management
+
+### Starting Sessions
+- Review .cursor/context for current state
+- Check completed milestones and next tasks
+- Identify any known issues from previous session
+
+### Ending Sessions
+- Update .cursor/context with progress made
+- Document any new issues discovered
+- Mark milestones as complete with work summary
+- Note next steps and priorities
+
+### Handoff Quality
+- Ensure another AI could continue work seamlessly
+- Document all design decisions and rationale
+- Include specific commands needed for next steps
+- Update checklist with current status 
