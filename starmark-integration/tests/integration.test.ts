@@ -1,4 +1,4 @@
-import { describe, test, expect } from 'vitest';
+import { describe, test, expect, vi } from 'vitest';
 import { starmark, StarMarkConfigSchema } from '../src/index.js';
 
 describe('StarMark Integration', () => {
@@ -65,15 +65,21 @@ describe('StarMark Integration', () => {
     expect(() => StarMarkConfigSchema.parse(fullConfig)).not.toThrow();
   });
 
-  test('should reject invalid configuration', () => {
-    // Invalid linear config (missing required fields)
-    const invalidConfig = {
+  test('should accept empty strings in configuration (CI-friendly)', () => {
+    // Empty strings should now be valid at schema level
+    const configWithEmptyStrings = {
       linear: {
-        apiKey: '', // Empty string should be invalid
+        apiKey: '', // Empty strings should be valid for CI/CD
+        teamId: '',
+      },
+      auth0: {
+        domain: '',
+        clientId: '',
+        clientSecret: '',
       },
     };
     
-    expect(() => StarMarkConfigSchema.parse(invalidConfig)).toThrow();
+    expect(() => StarMarkConfigSchema.parse(configWithEmptyStrings)).not.toThrow();
   });
 
   test('should handle integration hooks without crashing', () => {
@@ -86,9 +92,9 @@ describe('StarMark Integration', () => {
       addRenderer: () => {},
       injectScript: () => {},
       logger: {
-        info: () => {},
-        warn: () => {},
-        error: () => {},
+        info: vi.fn(),
+        warn: vi.fn(),
+        error: vi.fn(),
       },
     };
 
@@ -101,32 +107,74 @@ describe('StarMark Integration', () => {
     }).not.toThrow();
   });
 
-  test('should handle invalid config gracefully in hooks', () => {
+  test('should warn about empty config values but not fail', () => {
+    const mockLogger = {
+      info: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn(),
+    };
+
     const integration = starmark({
       linear: {
-        apiKey: '', // Invalid config
+        apiKey: '', // Empty config should warn but not fail
         teamId: '',
       },
-    } as any);
+      auth0: {
+        domain: '',
+        clientId: '',
+        clientSecret: '',
+      },
+    });
     
     const mockContext = {
       config: {},
       updateConfig: () => {},
       addRenderer: () => {},
       injectScript: () => {},
-      logger: {
-        info: () => {},
-        warn: () => {},
-        error: () => {},
-      },
+      logger: mockLogger,
     };
 
-    // Should throw with invalid config (fail-fast behavior)
+    // Should not throw with empty config (warn instead)
     expect(() => {
       const setupHook = integration.hooks['astro:config:setup'];
       if (setupHook) {
         setupHook(mockContext as any);
       }
-    }).toThrow('StarMark integration failed: Invalid configuration');
+    }).not.toThrow();
+
+    // Should have logged warnings
+    expect(mockLogger.warn).toHaveBeenCalled();
+    expect(mockLogger.warn).toHaveBeenCalledWith('StarMark integration configuration warnings:');
+  });
+
+  test('should handle structural errors properly', () => {
+    const mockLogger = {
+      info: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn(),
+    };
+
+    const integration = starmark({
+      ui: {
+        categories: ['Bug', 'Feature'],
+        position: 'invalid-position' as any,
+      },
+    });
+    
+    const mockContext = {
+      config: {},
+      updateConfig: () => {},
+      addRenderer: () => {},
+      injectScript: () => {},
+      logger: mockLogger,
+    };
+
+    // Should throw with structural validation errors
+    expect(() => {
+      const setupHook = integration.hooks['astro:config:setup'];
+      if (setupHook) {
+        setupHook(mockContext as any);
+      }
+    }).toThrow('StarMark integration failed: Invalid configuration structure');
   });
 }); 

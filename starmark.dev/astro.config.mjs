@@ -13,7 +13,7 @@ export default defineConfig({
         {
           icon: 'github',
           label: 'GitHub',
-          href: 'https://github.com/yourusername/astro-starmark',
+          href: 'https://github.com/tonyblank/astro-starmark',
         },
       ],
       sidebar: [
