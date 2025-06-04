@@ -42,7 +42,8 @@ test.describe('Integration Loading Tests', () => {
 
   test('should have proper navigation', async ({ page }) => {
     await page.goto('/', { waitUntil: 'networkidle' });
-    await expect(page.getByRole('navigation')).toBeVisible();
+    // Test for main sidebar navigation specifically (not table of contents)
+    await expect(page.getByRole('navigation', { name: 'Main' })).toBeVisible();
   });
 
   test('should load starmark integration without breaking the site', async ({ page }) => {
@@ -56,8 +57,8 @@ test.describe('Integration Loading Tests', () => {
     const mainHeading = page.locator('h1').first();
     await expect(mainHeading).toBeVisible({ timeout: 10000 });
     
-    // Verify starlight navigation works
-    await expect(page.getByRole('navigation')).toBeVisible();
+    // Verify starlight main navigation works (not table of contents)
+    await expect(page.getByRole('navigation', { name: 'Main' })).toBeVisible();
     
     // The integration should not break the page rendering
     await expect(page.locator('body')).toBeVisible();
