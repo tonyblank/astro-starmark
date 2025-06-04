@@ -150,13 +150,8 @@ export function starmark(
             console.log("Configuration warnings:", warnings);
           }
 
-          // TODO: Add client scripts for the feedback widget
-          // TODO: Add API routes for handling feedback submission
-          // TODO: Set up authentication middleware if Auth0 is configured
-          // TODO: Configure Linear/GitHub connectors
-
           logger.info(
-            "StarMark integration loaded successfully (no-op for now)",
+            "StarMark integration loaded successfully - use FeedbackWidget component manually for now",
           );
         } catch (error) {
           // Only abort on schema structure errors, not missing values

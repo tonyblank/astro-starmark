@@ -20,11 +20,12 @@
     "sourceMap": true,
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
-    "types": ["vitest/globals", "node"]
+    "types": ["vitest/globals", "node", "astro/client"]
   },
   "include": [
     "src/**/*",
-    "tests/**/*"
+    "tests/**/*",
+    "src/types/**/*.d.ts"
   ],
   "exclude": [
     "node_modules",
