@@ -220,6 +220,7 @@ interface StorageResult {
 - All tests must pass (`pnpm test`)
 - ESLint/Prettier compliance (`pnpm lint`)
 - TypeScript compilation without errors (`pnpm type-check`)
+- Generated code type-safety validation (`pnpm type-check:generated`)
 - No console.log statements in production code
 - Accessibility standards met (automated testing with axe)
 - Performance budgets met (Core Web Vitals)

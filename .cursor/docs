@@ -55,6 +55,9 @@ User Interaction → Client Validation → POST /api/feedback → Server Process
 - **Integration**: Uses Drizzle ORM with SQLite
 - **Schema**: id, page_url, highlighted_text, category, message, user_info, timestamp
 - **Migrations**: Automated with Drizzle migrations
+  - **Migration Drift Prevention**: Verify migration checksums to ensure schema consistency
+  - **CI Validation**: Include `drizzle-kit check` in CI pipeline to detect migration status
+  - **SQLite Considerations**: Multiple developers should coordinate migrations to prevent schema divergence
 - **Access**: Import from 'astro:db' in server context
 - **Testing**: In-memory SQLite with real schema migrations
 
