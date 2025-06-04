@@ -175,7 +175,7 @@ The widget is now fully functional, accessible, and properly integrated into Sta
   });
   ```
 - [ ] Create `FeedbackModal.astro` component
-- [ ] Create comprehensive Storybook stories (open/closed, different states)
+- [ ] Create e2e tests (open/closed, different states)
 - [ ] Add form HTML structure with proper semantic markup
 - [ ] Make test pass
 

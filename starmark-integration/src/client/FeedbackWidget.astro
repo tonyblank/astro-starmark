@@ -50,7 +50,7 @@ const widgetCategories = categories;
     font-family: var(--sl-font);
     font-size: var(--sl-text-sm);
     font-weight: 600;
-    z-index: 99999;
+    z-index: 1000;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
     transition: all 0.2s ease;
     display: flex;
@@ -100,7 +100,7 @@ const widgetCategories = categories;
   }
 
   /* Responsive behavior */
-  @container (max-width: 480px) {
+  @media (max-width: 480px) {
     .feedback-widget {
       padding: 10px 12px;
       font-size: var(--sl-text-xs);
@@ -137,33 +137,84 @@ const widgetCategories = categories;
 </style>
 
 <script>
-  // Client-side interactivity
-  function initializeFeedbackWidget() {
-    const widget = document.getElementById("starmark-feedback-widget");
+  // Client-side interactivity with proper cleanup
+  (function () {
+    // Use type assertion to safely access window property
+    const windowWithStarmark = window as any;
 
-    if (widget) {
-      // Add a data attribute to indicate the script has run
-      widget.setAttribute("data-script-loaded", "true");
+    // Prevent multiple initializations
+    if (windowWithStarmark.starmarkFeedbackWidget) {
+      return;
+    }
 
-      widget.addEventListener("click", () => {
-        console.log("Feedback widget clicked - modal will be implemented next");
-        // TODO: Open feedback modal
-      });
+    let widget: HTMLElement | null = null;
+    let clickHandler: (() => void) | null = null;
+    let keydownHandler: ((event: KeyboardEvent) => void) | null = null;
+    let domLoadedHandler: (() => void) | null = null;
 
-      // Keyboard navigation support
-      widget.addEventListener("keydown", (event) => {
-        if (event.key === "Enter" || event.key === " ") {
-          event.preventDefault();
+    function handleClick() {
+      if (!widget) return;
+
+      // TODO: Open feedback modal
+    }
+
+    function handleKeydown(event: KeyboardEvent) {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        if (widget) {
           widget.click();
         }
-      });
+      }
     }
-  }
 
-  // Initialize when DOM is ready
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", initializeFeedbackWidget);
-  } else {
-    initializeFeedbackWidget();
-  }
+    function initializeFeedbackWidget() {
+      widget = document.getElementById("starmark-feedback-widget");
+
+      if (widget) {
+        // Guard against double initialization
+        if (widget.getAttribute("data-script-loaded") === "true") {
+          return;
+        }
+
+        // Mark as initialized
+        widget.setAttribute("data-script-loaded", "true");
+
+        // Store handler references for cleanup
+        clickHandler = handleClick;
+        keydownHandler = handleKeydown;
+
+        // Add event listeners - use onclick for better Playwright compatibility
+        widget.onclick = clickHandler;
+        widget.addEventListener("keydown", keydownHandler);
+      }
+    }
+
+    function cleanup() {
+      if (widget && clickHandler && keydownHandler) {
+        widget.onclick = null;
+        widget.removeEventListener("keydown", keydownHandler);
+        widget = null;
+        clickHandler = null;
+        keydownHandler = null;
+      }
+    }
+
+    // Initialize when DOM is ready
+    domLoadedHandler = initializeFeedbackWidget;
+
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", domLoadedHandler);
+    } else {
+      initializeFeedbackWidget();
+    }
+
+    // Expose cleanup function globally for proper teardown
+    windowWithStarmark.starmarkFeedbackWidget = {
+      cleanup: cleanup,
+      initialized: true,
+    };
+
+    // Clean up on page unload
+    window.addEventListener("beforeunload", cleanup);
+  })();
 </script>
