@@ -1,0 +1,388 @@
+# Astro Docs Feedback Plugin Development Rules
+
+## Project Overview
+This is an Astro/Starlight documentation feedback plugin with:
+- Persistent feedback widget (floating bottom-right)
+- Text highlighting & annotation capabilities
+- Feedback form with categories and tags
+- Pluggable storage backends (Linear primary, Astro DB, Cloudflare D1)
+- Modular authentication system (Auth0 initially)
+- Built using Astro Islands architecture for performance
+
+## Architecture Principles
+
+### Core Technology Stack
+- Pure Astro/vanilla JS/TypeScript (NO React)
+- Astro Islands for client-side interactivity
+- PNPM workspace monorepo with Turborepo for build orchestration
+- **Modern Testing Stack (2025):**
+  - **Vitest**: Primary test runner (unit, component, integration)
+  - **MSW v2**: API mocking with Request/Response API
+  - **Playwright**: E2E testing with real browser automation
+  - **Testing Library**: Component testing utilities
+- GitHub Actions for CI/CD
+
+### Project Structure
+```
+astro-docs-feedback/           # Core plugin package
+├── src/
+│   ├── client/                # Client-side components
+│   │   ├── FeedbackWidget.astro
+│   │   ├── FeedbackModal.astro
+│   │   └── highlight.ts
+│   ├── server/                # Server-side logic
+│   │   ├── feedbackEndpoint.ts
+│   │   ├── LinearConnector.ts
+│   │   ├── AstroDbConnector.ts
+│   │   ├── D1Connector.ts
+│   │   └── Auth.ts
+│   └── translations/          # i18n strings
+└── tests/                     # Unit and integration tests
+
+docs-site/                     # Marketing/docs site + test environment
+├── src/
+│   ├── content/docs/          # Plugin documentation
+│   └── pages/api/             # Test API endpoints
+├── tests/                     # E2E tests for the site
+└── public/                    # Static assets
+```
+
+## Test-Driven Development Rules
+
+### Testing Philosophy
+1. **ALWAYS write tests BEFORE implementation** - This is strict TDD
+2. **Test interfaces, not implementations** - Focus on behavior
+3. **High test coverage required** - Aim for >90%, critical paths 100%
+4. **Test error conditions** - Don't just test happy paths
+
+### Streamlined Testing Stack (2025)
+
+#### Core Testing Tools
+- **Vitest**: Primary test runner with native ES modules support
+- **Playwright**: E2E testing with modern browser support
+- **MSW v2**: API mocking with Request/Response API
+- **Testing Library**: Component testing utilities
+- **@astrojs/test-utils**: Astro-specific testing helpers
+
+#### Additional Infrastructure
+- **Turborepo**: Monorepo task orchestration and caching
+- **GitHub Actions**: CI/CD with matrix testing across Node versions
+- **Codecov**: Coverage reporting and analysis
+- **Changesets**: Version management and changelog generation
+
+### When to Mock vs Real Implementation
+
+#### ALWAYS Mock:
+- External HTTP APIs (Linear GraphQL API, Auth0 endpoints)
+- Network requests using MSW (Mock Service Worker)
+- Browser APIs in unit tests (window.getSelection, etc.)
+- Authentication tokens/JWT verification
+- Time-sensitive operations (Date.now, setTimeout)
+
+#### NEVER Mock (Use Real):
+- Astro component rendering (use @astrojs/test-utils)
+- SQLite database operations (use in-memory DB or temp files)
+- DOM manipulation in integration tests
+- TypeScript compilation and type checking
+- CSS/SCSS compilation
+
+#### Conditional Mocking:
+- Astro DB: Mock the `db` object methods OR use real SQLite connection
+- File system operations: Mock in unit tests, real in integration tests
+- Environment variables: Mock in tests, real in E2E
+
+### Testing Layers
+
+#### 1. Unit Tests (Vitest)
+```typescript
+// Test individual functions/classes in isolation
+// Mock all external dependencies
+// Focus on business logic and edge cases
+// Run with: pnpm test:unit
+```
+
+#### 2. Component Tests (Vitest + Testing Library)
+```typescript
+// Test component behavior and user interactions
+// Use @astrojs/test-utils for Astro components
+// Test accessibility and keyboard navigation
+// Develop components directly in docs-site
+// Run with: pnpm test:component
+```
+
+#### 3. Integration Tests (Vitest + MSW)
+```typescript
+// Test component interactions and API flows
+// Mock external APIs but use real internal components
+// Test full request/response cycles
+// Run with: pnpm test:integration
+```
+
+#### 4. E2E Tests (Playwright)
+```typescript
+// Test complete user workflows in real browser
+// Test against the docs-site with real plugin integration
+// Minimal mocking (only external APIs if needed)
+// Run with: pnpm test:e2e
+```
+
+## Component Development Patterns
+
+### Astro Components
+- Use Astro's native JSX/TSX syntax
+- Hydrate components with appropriate strategies:
+  - `client:idle` for feedback widget
+  - `client:visible` for modals
+  - `client:load` only when necessary
+- Keep components small and focused
+- Use TypeScript interfaces for props
+- Develop and test components directly in docs-site
+
+### State Management
+- NO external state libraries
+- Use Astro's built-in reactivity
+- DOM APIs for simple state (selected text, modal open/close)
+- Custom events for component communication
+- Web Components for complex interactive elements
+
+### Styling
+- Use Starlight's CSS variables for theming
+- Scoped styles in Astro components
+- NO global CSS overrides
+- Support dark/light mode automatically
+- CSS Container Queries for responsive design
+
+## Data Flow Architecture
+
+### Frontend Submission Flow
+1. User interaction (widget click, text selection, form submission)
+2. Client-side validation and data collection
+3. POST to `/api/feedback` endpoint
+4. Show loading state, handle success/error responses
+
+### Backend Processing Flow
+1. Validate request data with Zod schemas
+2. Extract user authentication (if present)
+3. Process through configured connectors in parallel:
+   - LinearConnector.store()
+   - AstroDbConnector.store()
+   - D1Connector.store() (if configured)
+4. Return unified response with proper error handling
+
+### Connector Pattern
+```typescript
+interface FeedbackStorage {
+  store(feedback: FeedbackData): Promise<StorageResult>;
+}
+
+interface StorageResult {
+  success: boolean;
+  id?: string;
+  error?: Error;
+}
+```
+- Each connector implements this interface
+- Connectors are independent and can fail individually
+- Use dependency injection for testing
+- Proper error handling and logging
+
+## Error Handling Standards
+
+### Client-Side
+- Always provide user feedback (loading states, success/error messages)
+- Graceful degradation if JavaScript disabled
+- Handle network failures with retry options
+- Log errors to external service in production
+
+### Server-Side
+- Log errors but don't expose internals to client
+- Continue processing if one connector fails
+- Use appropriate HTTP status codes
+- Structured logging with correlation IDs
+
+### Testing Error Conditions
+- Network timeouts and failures
+- Invalid/malicious input data
+- Authentication failures
+- Database connection issues
+- Rate limiting scenarios
+
+## Development Workflow
+
+### Before Starting Any Feature
+1. Write failing test that describes expected behavior
+2. Run test to confirm it fails for the right reason
+3. Implement minimal code to make test pass
+4. Refactor while keeping tests green
+5. Add edge case tests
+
+### Code Quality Gates
+- All tests must pass (`pnpm test`)
+- ESLint/Prettier compliance (`pnpm lint`)
+- TypeScript compilation without errors (`pnpm type-check`)
+- Generated code type-safety validation (`pnpm type-check:generated`)
+- No console.log statements in production code
+- Accessibility standards met (automated testing with axe)
+- Performance budgets met (Core Web Vitals)
+
+### Commit Standards
+- Each commit should have passing tests
+- Use conventional commit messages
+- Include test files in commits
+- Keep commits atomic and focused
+- Run `pnpm changeset` for version changes
+
+### Branch Strategy
+- `main`: Production-ready code
+- `develop`: Integration branch for features
+- `feature/*`: Individual feature branches
+- Each milestone gets its own feature branch
+- PR must pass all CI checks and AI agent code review before merge
+
+## Authentication Integration
+
+### Auth0 Implementation
+- Store credentials server-side only
+- Validate tokens on server before processing
+- Support anonymous feedback by default
+- Graceful fallback if auth service unavailable
+- Use Auth0 SPA SDK for client-side integration
+- Test with Auth0 free plan in docs-site
+
+### Modular Auth Design
+```typescript
+interface AuthProvider {
+  getCurrentUser(request: Request): Promise<UserInfo | null>;
+  validateToken(token: string): Promise<boolean>;
+}
+```
+
+## Performance Requirements
+
+### Bundle Size
+- Plugin core < 50KB gzipped
+- Client-side code < 20KB gzipped
+- Use dynamic imports for non-critical features
+- Tree-shake unused code
+
+### Runtime Performance
+- Widget should not block page load (< 100ms impact)
+- Feedback submission under 2s normal conditions
+- No layout shifts when widget appears (CLS < 0.1)
+- Core Web Vitals: LCP < 2.5s, FID < 100ms
+
+### Memory Usage
+- Clean up event listeners properly
+- Remove temporary DOM elements after use
+- No memory leaks in long-running sessions
+- Monitor with performance.measureUserAgentSpecificMemory()
+
+## Accessibility Requirements
+
+### WCAG 2.2 AA Compliance
+- All interactive elements keyboard accessible
+- Proper ARIA labels and roles
+- Color contrast ratios ≥ 4.5:1
+- Screen reader friendly
+- Focus indicators visible
+- No seizure-inducing animations
+
+### Modal Accessibility
+- Focus management (trap focus, return focus)
+- ESC key closes modal
+- Backdrop click closes modal
+- ARIA attributes for modal state
+- Scroll lock when modal is open
+
+## Deployment & Distribution
+
+### Package Configuration
+- Proper peer dependencies for Astro/Starlight
+- TypeScript declarations included
+- Tree-shakeable exports (ESM only)
+- Support Node.js 18+ and latest browsers
+- Semantic versioning with changesets
+
+### Documentation Requirements
+- Comprehensive README with examples
+- API documentation generated from TypeScript
+- Interactive examples in docs-site
+- Migration guides for breaking changes
+- Troubleshooting section with common issues
+
+## Debugging Guidelines
+
+### Development Debugging
+- Use DEBUG environment variable for verbose logging
+- Include request/response logging in dev mode
+- Provide clear error messages with context
+- Source maps for debugging production builds
+
+### Production Debugging
+- No sensitive data in logs
+- Structured logging with correlation IDs
+- Error tracking with Sentry or similar
+- Performance monitoring with Real User Monitoring
+
+## Security Considerations
+
+### Data Handling
+- Sanitize all user input with DOMPurify
+- No PII in logs unless explicitly needed
+- Secure storage of API keys and tokens
+- Content Security Policy headers
+
+### API Security
+- Rate limiting on feedback endpoint (10 req/min per IP)
+- CSRF protection with tokens
+- Input validation with Zod schemas
+- SQL injection prevention
+
+### Privacy
+- Anonymous feedback by default
+- Clear data retention policies (90 days default)
+- GDPR compliance for EU users
+- Cookie consent for analytics
+
+## Integration Testing Strategy
+
+### Component Integration
+- Test widget + modal interaction in docs-site
+- Test highlight selection + form integration
+- Test form submission + server response handling
+- Test auth flow with mocked Auth0
+
+### Storage Integration
+- Test all connector combinations
+- Test partial failure scenarios
+- Test data consistency across connectors
+- Test with real databases in integration environment
+
+### Authentication Integration
+- Test logged-in vs anonymous users
+- Test token validation and refresh
+- Test auth provider failures
+- Test session management
+
+## CI/CD Pipeline
+
+### GitHub Actions Workflow
+1. **Install & Cache**: Install dependencies with pnpm, cache node_modules
+2. **Lint & Type Check**: Run ESLint, Prettier, TypeScript compiler
+3. **Unit Tests**: Run Vitest with coverage reporting
+4. **Component Tests**: Run component tests with Testing Library
+5. **Integration Tests**: Run API tests with MSW
+6. **E2E Tests**: Run Playwright tests against docs-site
+7. **Build**: Build all packages and ensure no errors
+8. **Release**: Generate changesets and publish to npm (on main)
+
+### Quality Gates
+- Test coverage ≥ 90%
+- All linting rules pass
+- No TypeScript errors
+- No accessibility violations
+- Performance budgets met
+- Security vulnerabilities resolved
+- AI agent code review approval
+
+Remember: Every feature starts with a failing test. Every bug fix starts with a test that reproduces the issue. No exceptions. 

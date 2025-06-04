@@ -1,0 +1,528 @@
+# Current Development Context
+
+## Project Phase: Setup & Initial Implementation
+Currently implementing the Astro docs feedback plugin according to the engineering plan. Following strict TDD approach with streamlined modern 2025 testing infrastructure.
+
+## Quick Reference Commands
+
+### Development Environment
+```bash
+# Root monorepo commands
+pnpm install                          # Install all dependencies
+pnpm build                           # Build all packages (via Turborepo)
+pnpm test                            # Run all tests in workspace
+pnpm lint                            # Lint all packages
+pnpm format                          # Format all code
+pnpm changeset                       # Create a changeset for versioning
+
+# Plugin package (astro-docs-feedback/)
+pnpm --filter astro-docs-feedback test         # Run plugin tests only
+pnpm --filter astro-docs-feedback test:watch   # Watch mode for plugin tests
+pnpm --filter astro-docs-feedback build        # Build plugin package
+
+# Documentation/marketing site (docs-site/)
+pnpm --filter docs-site dev                    # Start Starlight dev server
+pnpm --filter docs-site build                  # Build docs site
+pnpm --filter docs-site preview                # Preview built site
+pnpm --filter docs-site test:e2e               # Run E2E tests against site
+```
+
+### Testing Commands (Streamlined Stack)
+```bash
+# Unit tests (Vitest)
+pnpm test:unit                               # Run all unit tests
+pnpm test:unit --coverage                    # Run with coverage report
+pnpm test:unit --ui                          # Open Vitest UI
+pnpm test:unit src/server/LinearConnector.test.ts  # Test specific file
+
+# Component tests (Vitest + Testing Library)
+pnpm test:component                          # Run component tests
+pnpm test:component --watch                  # Watch mode
+
+# Integration tests (Vitest + MSW)
+pnpm test:integration                        # Run integration tests
+
+# E2E tests (Playwright)
+pnpm test:e2e                                # Run all E2E tests
+pnpm test:e2e --headed                       # Run with browser visible
+pnpm test:e2e tests/feedback-widget.spec.ts # Run specific E2E test
+pnpm test:e2e --debug                        # Debug mode
+
+# All tests
+pnpm test                                    # Run all test suites
+pnpm test:ci                                 # Run tests in CI mode
+
+# Debug tests
+pnpm test --reporter=verbose                 # Verbose test output
+DEBUG=* pnpm test                            # Enable debug logging
+```
+
+### Development Tools
+```bash
+# Type checking
+pnpm type-check                              # Check TypeScript types
+pnpm type-check --watch                      # Watch mode
+
+# Linting and formatting
+pnpm lint                                    # Run ESLint
+pnpm lint:fix                                # Fix auto-fixable issues
+pnpm format                                  # Run Prettier
+pnpm format:check                            # Check formatting
+
+# Build and packaging
+pnpm build                                   # Build all packages
+pnpm build:plugin                            # Build plugin only
+pnpm build:docs                              # Build docs site only
+pnpm clean                                   # Clean all build outputs
+```
+
+## Implementation Milestones Status
+
+### 🚧 Pending Implementation
+- [ ] Scaffold Integration (Project Setup)
+- [ ] Floating Widget Component
+- [ ] Feedback Modal & Form UI
+- [ ] Frontend->Backend Submission Logic
+- [ ] Backend Connectors Implementation
+- [ ] Auth0 Integration
+- [ ] Inline Highlight Trigger
+- [ ] Category & Tag Management
+- [ ] UI Polish & Accessibility
+- [ ] Documentation & Examples
+
+### 🎯 Current Focus
+Working on: **Scaffold Integration (Project Setup)**
+
+#### Next Steps:
+1. Create monorepo structure with PNPM workspaces + Turborepo
+2. Set up basic Astro integration export (fails gracefully)
+3. Create docs-site (Starlight) that serves as both documentation and test environment
+4. Write first test to verify integration loads without errors
+5. Set up streamlined testing infrastructure (Vitest + MSW + Playwright + Testing Library)
+6. Configure CI/CD pipeline with GitHub Actions
+7. Each feature branch will be reviewed by AI agent before merge
+
+## Testing Patterns to Remember
+
+### Mock External APIs (Always) - MSW v2 Syntax
+```typescript
+import { http, HttpResponse } from 'msw';
+import { setupServer } from 'msw/node';
+
+const server = setupServer(
+  http.post('https://api.linear.app/graphql', () => {
+    return HttpResponse.json({
+      data: { issueCreate: { success: true, issue: { id: 'test-123' } } }
+    });
+  }),
+  http.get('https://dev-example.auth0.com/userinfo', () => {
+    return HttpResponse.json({
+      sub: 'auth0|123',
+      email: 'test@example.com',
+      name: 'Test User'
+    });
+  })
+);
+
+beforeAll(() => server.listen());
+afterEach(() => server.resetHandlers());
+afterAll(() => server.close());
+```
+
+### Test Astro Components (Modern Approach)
+```typescript
+import { experimental_AstroContainer as AstroContainer } from 'astro/container';
+import { getViteConfig } from 'astro/config';
+import FeedbackWidget from '../src/client/FeedbackWidget.astro';
+
+test('widget renders with correct props', async () => {
+  const container = await AstroContainer.create({
+    viteConfig: await getViteConfig()
+  });
+  
+  const result = await container.renderToString(FeedbackWidget, {
+    props: { categories: ['Typo', 'Confusing'] }
+  });
+  
+  expect(result).toContain('data-testid="feedback-widget"');
+  expect(result).toContain('aria-label="Open feedback form"');
+});
+```
+
+### Database Testing (Use Real SQLite with Drizzle)
+```typescript
+import Database from 'better-sqlite3';
+import { drizzle } from 'drizzle-orm/better-sqlite3';
+import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
+import { feedbackTable } from '../src/server/schema';
+
+describe('AstroDbConnector', () => {
+  let db: ReturnType<typeof drizzle>;
+  
+  beforeEach(async () => {
+    const sqlite = new Database(':memory:');
+    db = drizzle(sqlite);
+    await migrate(db, { migrationsFolder: './drizzle' });
+  });
+  
+  afterEach(() => {
+    db.$client.close();
+  });
+});
+```
+
+### E2E Testing Patterns (Playwright with Modern Features)
+```typescript
+import { test, expect } from '@playwright/test';
+
+test('feedback widget interaction flow', async ({ page }) => {
+  // Navigate to docs site with plugin installed
+  await page.goto('http://localhost:4321/docs/getting-started');
+  
+  // Wait for hydration
+  await page.waitForLoadState('networkidle');
+  
+  // Test widget visibility and accessibility
+  const widget = page.getByTestId('feedback-widget');
+  await expect(widget).toBeVisible();
+  await expect(widget).toHaveAttribute('aria-label', 'Open feedback form');
+  
+  // Test keyboard navigation
+  await page.keyboard.press('Tab');
+  await expect(widget).toBeFocused();
+  await page.keyboard.press('Enter');
+  
+  // Test modal opening and focus management
+  const modal = page.getByTestId('feedback-modal');
+  await expect(modal).toBeVisible();
+  await expect(page.getByRole('combobox', { name: 'Category' })).toBeFocused();
+  
+  // Test form submission
+  await page.selectOption('[name="category"]', 'Typo');
+  await page.fill('[name="comment"]', 'Test feedback submission');
+  await page.click('[type="submit"]');
+  
+  // Verify success state
+  await expect(page.getByTestId('success-message')).toBeVisible();
+  await expect(modal).not.toBeVisible();
+});
+```
+
+## File Structure Templates
+
+### Component Structure (Develop in docs-site)
+```typescript
+// Component.astro
+---
+export interface Props {
+  /** Brief description of prop */
+  prop1: string;
+  /** Another prop with default */
+  prop2?: boolean;
+}
+
+const { prop1, prop2 = false } = Astro.props;
+---
+
+<div 
+  data-testid="component-name"
+  class="component-root"
+  role="button"
+  tabindex="0"
+  aria-label="Component description"
+>
+  <!-- Component HTML -->
+</div>
+
+<style>
+  .component-root {
+    /* Scoped styles using Starlight variables */
+    background: var(--sl-color-bg);
+    color: var(--sl-color-text);
+    border: 1px solid var(--sl-color-border);
+  }
+  
+  @container (max-width: 768px) {
+    .component-root {
+      /* Responsive styles */
+    }
+  }
+</style>
+
+<script>
+  // Client-side hydration logic
+  class ComponentName {
+    constructor(element: HTMLElement) {
+      this.element = element;
+      this.bindEvents();
+    }
+    
+    private bindEvents() {
+      this.element.addEventListener('click', this.handleClick.bind(this));
+      this.element.addEventListener('keydown', this.handleKeydown.bind(this));
+    }
+    
+    private handleClick(event: Event) {
+      // Click handler
+    }
+    
+    private handleKeydown(event: KeyboardEvent) {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        this.handleClick(event);
+      }
+    }
+  }
+  
+  // Initialize component
+  document.addEventListener('DOMContentLoaded', () => {
+    const elements = document.querySelectorAll('[data-testid="component-name"]');
+    elements.forEach(el => new ComponentName(el as HTMLElement));
+  });
+</script>
+```
+
+### Connector Structure (with Modern Error Handling)
+```typescript
+// Connector.ts
+import { z } from 'zod';
+
+export interface FeedbackStorage {
+  store(feedback: FeedbackData): Promise<StorageResult>;
+  health(): Promise<boolean>;
+}
+
+export interface StorageResult {
+  success: boolean;
+  id?: string;
+  error?: Error;
+  retryable?: boolean;
+}
+
+export class LinearConnector implements FeedbackStorage {
+  private readonly apiKey: string;
+  private readonly teamId: string;
+  private readonly baseUrl = 'https://api.linear.app/graphql';
+  
+  constructor(config: LinearConfig) {
+    this.apiKey = config.apiKey;
+    this.teamId = config.teamId;
+  }
+  
+  async store(feedback: FeedbackData): Promise<StorageResult> {
+    try {
+      const mutation = this.buildMutation(feedback);
+      const response = await this.makeRequest(mutation);
+      
+      if (response.data?.issueCreate?.success) {
+        return {
+          success: true,
+          id: response.data.issueCreate.issue.id,
+        };
+      }
+      
+      throw new Error(response.errors?.[0]?.message || 'Unknown error');
+    } catch (error) {
+      return {
+        success: false,
+        error: error as Error,
+        retryable: this.isRetryableError(error),
+      };
+    }
+  }
+  
+  async health(): Promise<boolean> {
+    try {
+      const response = await fetch(this.baseUrl, {
+        method: 'POST',
+        headers: this.getHeaders(),
+        body: JSON.stringify({ query: '{ viewer { id } }' }),
+      });
+      return response.ok;
+    } catch {
+      return false;
+    }
+  }
+  
+  private buildMutation(feedback: FeedbackData): string {
+    // GraphQL mutation logic
+  }
+  
+  private async makeRequest(mutation: string) {
+    // HTTP request logic with retries
+  }
+  
+  private isRetryableError(error: unknown): boolean {
+    // Determine if error is retryable (rate limits, network issues, etc.)
+  }
+  
+  private getHeaders() {
+    return {
+      'Authorization': `Bearer ${this.apiKey}`,
+      'Content-Type': 'application/json',
+    };
+  }
+}
+```
+
+### Test Structure (with Modern Vitest Features)
+```typescript
+// Component.test.ts
+import { describe, test, expect, beforeEach, afterEach, vi } from 'vitest';
+import { cleanup } from '@testing-library/astro';
+
+describe('ComponentName', () => {
+  beforeEach(() => {
+    // Setup mocks and test environment
+    vi.useFakeTimers();
+  });
+  
+  afterEach(() => {
+    cleanup();
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+  
+  test('should behave correctly when user interacts', async () => {
+    // Arrange
+    const props = { prop1: 'test', prop2: true };
+    
+    // Act
+    const result = await renderComponent(Component, { props });
+    
+    // Assert
+    expect(result).toMatchSnapshot();
+  });
+  
+  test('should handle error when API fails', async () => {
+    // Test error conditions with proper mock setup
+  });
+  
+  test.each([
+    ['mobile', { width: 375, height: 667 }],
+    ['tablet', { width: 768, height: 1024 }],
+    ['desktop', { width: 1200, height: 800 }],
+  ])('should render correctly on %s viewport', async (device, viewport) => {
+    // Responsive testing
+  });
+});
+```
+
+## Environment Variables for Testing
+
+### Required for Full Testing
+```bash
+# Linear integration
+LINEAR_API_KEY=lin_api_your_key_here
+LINEAR_TEAM_ID=team_your_team_id_here
+
+# Auth0 integration (free plan)
+AUTH0_DOMAIN=your-tenant.auth0.com
+AUTH0_CLIENT_ID=your_client_id_here
+AUTH0_CLIENT_SECRET=your_client_secret_here
+AUTH0_AUDIENCE=https://api.yourapp.com
+
+# Test environment
+NODE_ENV=test
+DEBUG=astro-docs-feedback:*
+PLAYWRIGHT_BROWSERS_PATH=./browsers
+
+# CI/CD environment
+CI=true
+COVERAGE_THRESHOLD=90
+```
+
+### Local Development Only
+```bash
+# Documentation site configuration
+PUBLIC_SITE_URL=http://localhost:4321
+```
+
+## Modern Tooling Configuration
+
+### Turborepo Pipeline
+```json
+{
+  "pipeline": {
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**", ".astro/**"]
+    },
+    "test": {
+      "dependsOn": ["build"],
+      "inputs": ["src/**", "tests/**"]
+    },
+    "lint": {
+      "inputs": ["src/**", "*.config.*"]
+    },
+    "type-check": {
+      "dependsOn": ["^build"],
+      "inputs": ["src/**", "*.config.*"]
+    }
+  }
+}
+```
+
+### GitHub Actions Matrix
+```yaml
+strategy:
+  matrix:
+    node-version: [18, 20, 22]
+    os: [ubuntu-latest, windows-latest, macos-latest]
+    include:
+      - node-version: 20
+        os: ubuntu-latest
+        primary: true
+```
+
+## Branch & Review Workflow
+
+### Branch Strategy
+- `main`: Production-ready code
+- `develop`: Integration branch for features
+- `feature/milestone-X`: Each milestone gets its own branch
+- AI agent reviews all PRs before merge
+- All CI checks must pass + AI approval
+
+### AI Agent Code Review Process
+1. Create feature branch for milestone
+2. Implement following TDD (test first)
+3. Push branch and create PR
+4. AI agent reviews code automatically
+5. Address AI agent feedback
+6. Merge only after AI approval + passing tests
+
+## Common Error Patterns to Watch For
+
+### Astro-Specific Issues (2025)
+- Hydration mismatches between server and client
+- Import path issues with Astro components
+- Missing `client:*` directives for interactive components
+- SSR vs SSG deployment differences
+- View Transitions API conflicts
+- Content Collections validation errors
+
+### Modern Testing Issues
+- MSW v2 syntax changes (use `http.post` not `rest.post`)
+- Playwright auto-waiting vs manual waits
+- Vitest ESM module resolution
+- Container queries in test environments
+
+### Integration Issues
+- Plugin not exporting correct Starlight plugin interface
+- Missing peer dependencies in package.json
+- TypeScript declaration file generation
+- Build output not matching expected format
+- Turborepo cache invalidation
+- GitHub Actions workflow dependencies
+
+## Current File Locations
+- Engineering Plan: `/Users/blank/projects/clarus/docs/ENG_PLAN.md` (will be removed)
+- Workspace Root: `/Users/blank/projects/clarus/docs`
+- Shell: `/bin/zsh`
+- OS: macOS (darwin 23.6.0)
+
+## Development Tools URLs (Local)
+- Docs Site: http://localhost:4321
+- Vitest UI: http://localhost:51204
+- Playwright Report: http://localhost:9323 

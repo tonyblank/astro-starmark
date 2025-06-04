@@ -1,0 +1,388 @@
+# Astro Docs Feedback Plugin - Technical Specifications
+
+## Core Features Implementation
+
+### 1. Persistent Feedback Widget
+- **Location**: Fixed bottom-right position
+- **Hydration**: `client:idle` to minimize page load impact
+- **Styling**: Uses Starlight theme variables for native appearance
+- **Accessibility**: Full WCAG 2.2 AA compliance with keyboard navigation, ARIA labels
+- **Behavior**: Opens modal on click, shows loading states
+- **Performance**: < 100ms impact on page load, CLS < 0.1
+
+### 2. Text Highlighting & Annotation
+- **API**: Uses browser Selection API (`window.getSelection()`)
+- **Trigger**: On text selection, shows "Feedback?" tooltip near selection
+- **Context Capture**: Records highlighted text + DOM context (section ID/heading)
+- **Integration**: Pre-fills modal with quoted text
+- **Mobile**: Touch event support for text selection
+- **Accessibility**: Keyboard-accessible selection alternatives
+
+### 3. Feedback Form Modal
+- **Categories**: Configurable dropdown (Typo, Confusing, Outdated, Missing, Other)
+- **Custom Tags**: "Suggest a tag" input for new categories
+- **Validation**: Client-side and server-side validation with Zod schemas
+- **Accessibility**: Focus management, ESC to close, backdrop click, scroll lock
+- **i18n**: Full localization using Starlight's translation system
+- **Visual Testing**: Comprehensive Storybook stories for all states
+
+### 4. Inline "Confused?" Links
+- **Placement**: End of sections or after code blocks
+- **Trigger**: Opens modal with section context pre-filled
+- **Styling**: Subtle, unobtrusive appearance
+- **Implementation**: Auto-insertion or explicit shortcode
+
+## Data Flow & Storage Architecture
+
+### Request/Response Cycle
+```
+User Interaction → Client Validation → POST /api/feedback → Server Processing → Connector Storage → Response
+```
+
+### Storage Connectors (Pluggable)
+
+#### Linear Connector (Primary)
+- **API**: GraphQL API for issue creation
+- **Authentication**: API key (server-side only)
+- **Data Mapping**: 
+  - Title: Page title + category
+  - Description: Full context (URL, quote, user comment, metadata)
+  - Labels: Category tags
+- **Error Handling**: Retry logic for rate limits, health checks
+- **Testing**: MSW v2 mocking with realistic responses
+
+#### Astro DB Connector
+- **Integration**: Uses Drizzle ORM with SQLite
+- **Schema**: id, page_url, highlighted_text, category, message, user_info, timestamp
+- **Migrations**: Automated with Drizzle migrations
+  - **Migration Drift Prevention**: Verify migration checksums to ensure schema consistency
+  - **CI Validation**: Include `drizzle-kit check` in CI pipeline to detect migration status
+  - **SQLite Considerations**: Multiple developers should coordinate migrations to prevent schema divergence
+- **Access**: Import from 'astro:db' in server context
+- **Testing**: In-memory SQLite with real schema migrations
+
+#### Cloudflare D1 Connector
+- **Environment**: Cloudflare binding in CF Pages deployment
+- **API**: D1 REST API or direct bindings
+- **Schema**: Similar to Astro DB structure
+- **Use Case**: Alternative to Astro DB for CF deployments
+
+### Authentication System (Modular)
+
+#### Auth0 Integration
+- **Flow**: JWT token validation on server
+- **API**: Auth0 Management API for user profile
+- **Configuration**: Domain, Client ID, API secret
+- **Fallback**: Anonymous submission always supported
+- **SDK**: Auth0 SPA SDK for client-side integration
+- **Testing**: Comprehensive mocking of Auth0 endpoints
+
+#### Interface Design
+```typescript
+interface AuthProvider {
+  getCurrentUser(request: Request): Promise<UserInfo | null>;
+  validateToken(token: string): Promise<boolean>;
+}
+```
+
+## Component Architecture
+
+### FeedbackWidget.astro
+- **State**: Modal open/close, selected text storage
+- **Events**: Click handler, keyboard navigation
+- **Hydration**: `client:idle`
+- **Communication**: Custom events to modal
+- **Storybook**: Stories for all positions, themes, states
+
+### FeedbackModal.astro
+- **Props**: Categories, initial data, auth state
+- **State**: Form data, submission status
+- **Validation**: Required fields, text length limits, Zod schemas
+- **Submission**: Fetch to /api/feedback endpoint
+- **Storybook**: Stories for form states, validation, themes
+
+### highlight.ts
+- **Events**: mouseup, touchend for text selection
+- **DOM**: Creates temporary tooltip elements
+- **Cleanup**: Removes elements on interaction end
+- **Integration**: Communicates with widget via custom events
+- **Performance**: Debounced event handling
+
+## Testing Strategy Details (2025)
+
+### Modern Testing Stack
+- **Vitest**: Primary test runner with native ES modules
+- **Playwright**: E2E testing with latest browser support
+- **MSW v2**: API mocking with Request/Response API
+- **Testing Library**: Component testing utilities
+
+### Unit Test Patterns
+```typescript
+// Connector tests with MSW v2
+describe('LinearConnector', () => {
+  beforeEach(() => {
+    server.use(
+      http.post('https://api.linear.app/graphql', () => {
+        return HttpResponse.json({ 
+          data: { 
+            issueCreate: { 
+              success: true, 
+              issue: { id: 'test-123' } 
+            } 
+          } 
+        });
+      })
+    );
+  });
+});
+
+// Component tests with modern Astro testing
+describe('FeedbackModal', () => {
+  test('renders categories from config', async () => {
+    const container = await AstroContainer.create({
+      viteConfig: await getViteConfig()
+    });
+    const result = await container.renderToString(FeedbackModal, {
+      props: { categories: ['Typo', 'Confusing'] }
+    });
+    expect(result).toContain('data-testid="feedback-modal"');
+  });
+});
+```
+
+### Integration Test Patterns
+```typescript
+// Full API flow test with health checks
+describe('Feedback Submission', () => {
+  test('creates Linear issue and DB entry with health monitoring', async () => {
+    const response = await POST('/api/feedback', {
+      body: JSON.stringify(mockFeedback)
+    });
+    expect(response.status).toBe(200);
+    
+    const result = await response.json();
+    expect(result.success).toBe(true);
+    expect(result.results).toHaveLength(2); // Linear + DB
+  });
+});
+```
+
+### E2E Test Patterns (docs-site as Test Environment)
+```typescript
+// User workflow tests against docs-site
+test('user can highlight text and submit feedback', async ({ page }) => {
+  await page.goto('http://localhost:4321/docs/getting-started');
+  await page.waitForLoadState('networkidle');
+  
+  // Test text selection
+  await page.locator('h2').first().selectText();
+  await page.getByTestId('highlight-tooltip').click();
+  
+  // Test form submission
+  await page.selectOption('[name="category"]', 'Confusing');
+  await page.fill('[name="comment"]', 'This needs clarification');
+  await page.click('[type="submit"]');
+  
+  // Verify success
+  await expect(page.getByTestId('success-message')).toBeVisible();
+});
+```
+
+## Configuration & Plugin Options
+
+### Integration Setup (Updated for docs-site)
+```typescript
+// astro.config.mjs (docs-site)
+export default defineConfig({
+  integrations: [
+    starlight({
+      title: 'Astro Docs Feedback Plugin',
+      plugins: [
+        docsFeedback({
+          // Storage configuration
+          linear: {
+            apiKey: process.env.LINEAR_API_KEY,
+            teamId: 'team_123',
+            projectId: 'project_456' // optional
+          },
+          astroDb: true,
+          cloudflareD1: {
+            databaseId: 'db_789'
+          },
+          
+          // UI configuration
+          categories: ['Typo', 'Confusing', 'Outdated', 'Missing', 'Other'],
+          widget: {
+            position: 'bottom-right',
+            icon: 'feedback',
+            text: 'Feedback'
+          },
+          
+          // Authentication (Auth0 free plan)
+          auth: {
+            provider: 'auth0',
+            domain: 'dev-example.auth0.com',
+            clientId: process.env.AUTH0_CLIENT_ID,
+            audience: 'https://api.example.com'
+          },
+          
+          // Behavior
+          enableHighlighting: true,
+          enableInlineLinks: true,
+          insertionStrategy: 'auto',
+          
+          // i18n
+          defaultLocale: 'en',
+          translations: {
+            en: { ... },
+            es: { ... }
+          }
+        })
+      ]
+    })
+  ]
+});
+```
+
+## Performance Considerations (2025 Standards)
+
+### Bundle Optimization
+- **Plugin Core**: < 50KB gzipped
+- **Client Code**: < 20KB gzipped
+- **Lazy Loading**: Modal loaded on first interaction
+- **Tree Shaking**: Only include used connectors
+- **Code Splitting**: Separate chunks for client/server
+
+### Runtime Performance (Core Web Vitals)
+- **LCP**: < 2.5s (widget doesn't impact main content)
+- **FID**: < 100ms (widget interaction)
+- **CLS**: < 0.1 (no layout shifts)
+- **Hydration**: < 100ms impact on page load
+- **Memory**: Monitor with performance.measureUserAgentSpecificMemory()
+
+### Caching Strategy
+- **Static Assets**: SVG icons, CSS embedded in components
+- **API Responses**: No caching (feedback is always fresh)
+- **Auth Tokens**: Secure client-side storage
+- **Turborepo**: Build caching for development efficiency
+
+## Security Implementation (2025 Standards)
+
+### Input Validation
+```typescript
+const FeedbackSchema = z.object({
+  page: z.string().url(),
+  category: z.enum(['Typo', 'Confusing', 'Outdated', 'Missing', 'Other']),
+  comment: z.string().max(1000).optional(),
+  highlightedText: z.string().max(500).optional(),
+  suggestedTag: z.string().max(50).optional(),
+  timestamp: z.string().datetime(),
+  userAgent: z.string().optional()
+});
+```
+
+### API Security
+- **Rate Limiting**: 10 requests/minute per IP
+- **CSRF Protection**: Tokens for state-changing operations
+- **CORS**: Restrict to same origin
+- **Content Security Policy**: Strict CSP headers
+- **Input Sanitization**: DOMPurify for HTML content
+
+### Privacy Protection (GDPR Compliant)
+- **Anonymous Default**: No tracking without consent
+- **Data Minimization**: Only collect necessary feedback data
+- **Retention Policy**: 90 days default with configurable cleanup
+- **Cookie Consent**: Required for analytics
+- **Right to Delete**: API for data deletion requests
+
+## Deployment & Distribution
+
+### Package Structure (ESM-only for 2025)
+```
+astro-docs-feedback/
+├── dist/                    # Compiled JavaScript (ESM only)
+├── src/                     # TypeScript source
+├── types/                   # TypeScript declarations
+├── stories/                 # Storybook stories
+├── drizzle/                 # Database migrations
+├── README.md
+├── CHANGELOG.md
+├── LICENSE
+└── package.json
+```
+
+### npm Package Configuration (Modern)
+```json
+{
+  "name": "astro-docs-feedback",
+  "type": "module",
+  "exports": {
+    ".": "./dist/index.js",
+    "./client": "./dist/client/index.js",
+    "./server": "./dist/server/index.js"
+  },
+  "types": "./dist/index.d.ts",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "peerDependencies": {
+    "astro": "^4.0.0",
+    "@astrojs/starlight": "^0.20.0"
+  }
+}
+```
+
+### CI/CD Pipeline (GitHub Actions)
+1. **Setup**: Install dependencies with pnpm, cache node_modules
+2. **Quality**: ESLint, Prettier, TypeScript compilation
+3. **Unit Tests**: Vitest with coverage reporting
+4. **Component Tests**: Storybook build and visual regression
+5. **Integration Tests**: API tests with MSW
+6. **E2E Tests**: Playwright against docs-site
+7. **Build**: All packages with Turborepo
+8. **Release**: Changesets and npm publish (on main)
+
+### Quality Gates
+- Test coverage ≥ 90%
+- All linting rules pass
+- No TypeScript errors
+- No accessibility violations (axe-core)
+- Performance budgets met (Core Web Vitals)
+- Security vulnerabilities resolved (Snyk)
+
+## Development Environment (docs-site Integration)
+
+### Dual-Purpose docs-site
+- **Documentation**: Complete plugin documentation and examples
+- **Test Environment**: Real-world testing with actual Starlight integration
+- **Auth0 Integration**: Live authentication testing with free plan
+- **Performance Testing**: Real Core Web Vitals measurements
+- **Accessibility Testing**: Real screen reader and keyboard testing
+
+### Development URLs
+- **Docs Site**: http://localhost:4321
+- **Storybook**: http://localhost:6006
+- **Vitest UI**: http://localhost:51204
+- **Playwright Report**: http://localhost:9323
+
+### Turborepo Integration
+```json
+{
+  "pipeline": {
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**", ".astro/**"]
+    },
+    "test": {
+      "dependsOn": ["build"],
+      "inputs": ["src/**", "tests/**", "stories/**"]
+    },
+    "test:e2e": {
+      "dependsOn": ["docs-site#build"],
+      "inputs": ["tests/**"]
+    }
+  }
+}
+```
+
+This technical specification reflects the modern 2025 development practices and the dual-purpose docs-site approach for comprehensive testing and documentation. 
