@@ -7,32 +7,19 @@ description: Get StarMark running on your Astro site in 5 minutes
 
 This guide will help you add StarMark to your Astro documentation site in just a few minutes.
 
-## Prerequisites
-
-- An existing Astro project
-- Node.js 18+ and pnpm/npm
-- (Optional) Linear account for feedback collection
-
 ## Installation
 
 Install StarMark using your preferred package manager:
 
 ```bash
-# With pnpm
-pnpm add starmark-integration
-
-# With npm
 npm install starmark-integration
-
-# With yarn
-yarn add starmark-integration
 ```
 
 ## Basic Setup
 
 Add StarMark to your Astro configuration:
 
-```js title="astro.config.mjs"
+```js
 import { defineConfig } from "astro/config";
 import starmark from "starmark-integration";
 
@@ -40,13 +27,20 @@ export default defineConfig({
   integrations: [
     starmark({
       ui: {
-        categories: ["Bug", "Feature Request", "Question", "Typo"],
-        position: "bottom-right",
+        categories: ["Bug", "Feature Request", "Question"],
       },
     }),
   ],
 });
 ```
+
+That's it! A feedback widget will appear on your site.
+
+## Prerequisites
+
+- An existing Astro project
+- Node.js 18+ and pnpm/npm
+- (Optional) Linear account for feedback collection
 
 ## For Starlight Sites
 

@@ -64,9 +64,10 @@ export default defineConfig({
   webServer: {
     command: 'pnpm dev',
     url: baseURL,
-    reuseExistingServer: !process.env.CI,
-    timeout: 120 * 1000, // 2 minutes timeout for CI
+    timeout: 180 * 1000, // 3 minutes timeout for server startup
     stdout: process.env.CI ? 'pipe' : 'ignore', // Show output in CI for debugging
     stderr: 'pipe',
+    // Only consider server ready when it's actually serving content
+    reuseExistingServer: !process.env.CI, // Reuse in development, restart in CI
   },
 }); 

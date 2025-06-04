@@ -9,6 +9,7 @@ export default defineConfig({
     starlight({
       title: 'StarMark',
       description: 'Feedback collection for Astro documentation sites',
+      favicon: '/favicon.svg',
       social: [
         {
           icon: 'github',
@@ -22,22 +23,6 @@ export default defineConfig({
           items: [
             { label: 'Introduction', link: '/' },
             { label: 'Quick Start', link: '/getting-started/quick-start/' },
-            { label: 'Installation', link: '/getting-started/installation/' },
-          ],
-        },
-        {
-          label: 'Configuration',
-          items: [
-            { label: 'Basic Setup', link: '/configuration/basic-setup/' },
-            { label: 'Linear Integration', link: '/configuration/linear/' },
-            { label: 'Auth0 Integration', link: '/configuration/auth0/' },
-          ],
-        },
-        {
-          label: 'API Reference',
-          items: [
-            { label: 'Integration Options', link: '/reference/options/' },
-            { label: 'Components', link: '/reference/components/' },
           ],
         },
       ],
