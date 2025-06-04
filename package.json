@@ -28,7 +28,11 @@
     "clean": "turbo clean",
     "changeset": "changeset",
     "changeset:version": "changeset version",
-    "changeset:publish": "changeset publish"
+    "changeset:publish": "changeset publish",
+    "audit": "pnpm audit --audit-level moderate",
+    "ci-check": "echo '🧪 Running FULL CI checks (this will take a while)...' && pnpm type-check && pnpm lint && pnpm format:check && pnpm build && pnpm test && echo '🔒 Running security audit...' && pnpm audit --audit-level high && cd starmark-integration && pnpm audit --audit-level moderate && cd .. && echo '🎭 Installing Playwright browsers...' && pnpm --filter starmark.dev exec playwright install --with-deps && echo '🧪 Running E2E tests...' && pnpm test:e2e && echo '✅ All CI checks passed!'",
+    "ci-check-quick": "echo '🧪 Running quick CI checks...' && pnpm type-check && pnpm lint && pnpm format:check && pnpm build && echo '✅ Quick checks passed!'",
+    "prepare": "husky"
   },
   "devDependencies": {
     "@changesets/cli": "^2.27.1",

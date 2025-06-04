@@ -63,7 +63,7 @@ test.describe('Integration Loading Tests', () => {
     }
   });
 
-  test('should load starmark integration without breaking the site', async ({ page, isMobile }) => {
+  test('should load starmark integration without breaking the site', async ({ page }) => {
     // Navigate to the homepage first (more reliable than a deep page)
     await page.goto('/', { waitUntil: 'networkidle' });
     
