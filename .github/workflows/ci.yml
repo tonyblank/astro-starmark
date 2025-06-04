@@ -106,5 +106,5 @@ jobs:
       - name: Run security audit
         run: pnpm audit --audit-level high
 
-      - name: Check for vulnerabilities
-        run: pnpm --filter starmark-integration audit --audit-level moderate 
+      - name: Check for vulnerabilities in starmark-integration
+        run: cd starmark-integration && pnpm audit --audit-level moderate 
