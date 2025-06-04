@@ -1,0 +1,565 @@
+# TDD Implementation Checklist
+
+## Milestone 1: Scaffold Integration (Project Setup) 🚧
+
+### Project Structure Setup
+- [ ] Create root `pnpm-workspace.yaml` file
+- [ ] Create `turbo.json` for build orchestration
+- [ ] Create `astro-docs-feedback/` package directory
+- [ ] Create `docs-site/` package directory (marketing/docs + test environment)
+- [ ] Set up package.json files with correct dependencies and workspace references
+- [ ] Verify PNPM workspace linking works (`pnpm install` succeeds)
+
+### Basic Integration Export
+- [ ] **TEST**: Write test for integration export structure
+  ```typescript
+  // Test that integration exports correct shape
+  test('exports valid Starlight plugin function', () => {
+    const plugin = docsFeedbackPlugin({});
+    expect(plugin).toHaveProperty('name');
+    expect(plugin).toHaveProperty('hooks');
+  });
+  ```
+- [ ] Create `astro-docs-feedback/src/index.ts` with basic integration export
+- [ ] Make test pass with minimal implementation
+- [ ] Add TypeScript configuration and ensure compilation works
+
+### Docs Site Setup (Marketing + Test Environment)
+- [ ] **TEST**: Write test for docs site Astro config
+  ```typescript
+  // Test that docs site can import and use plugin
+  test('docs site config includes plugin without errors', async () => {
+    const config = await loadAstroConfig('./docs-site/astro.config.mjs');
+    expect(config.integrations).toBeDefined();
+  });
+  ```
+- [ ] Create Starlight site in `docs-site/` for plugin documentation
+- [ ] Add plugin to docs site's astro.config.mjs
+- [ ] Create documentation content structure
+- [ ] Configure Auth0 integration for testing
+- [ ] Verify site builds and runs without errors (`pnpm --filter docs-site dev`)
+- [ ] Make integration test pass
+
+### Modern Testing Infrastructure (2025)
+- [ ] Set up Vitest configuration for unit/component/integration tests
+- [ ] Set up MSW v2 for API mocking
+- [ ] Set up Playwright for E2E testing against docs-site
+- [ ] Set up Storybook for component development and visual testing
+- [ ] Configure Turborepo for monorepo task orchestration
+- [ ] Create test utilities and helpers
+- [ ] Add test scripts to package.json files
+- [ ] Verify all test commands work (`pnpm test` from root)
+
+### CI/CD Pipeline Setup
+- [ ] Create GitHub Actions workflow with matrix testing
+- [ ] Configure Chromatic for visual regression testing
+- [ ] Set up Codecov for coverage reporting
+- [ ] Configure Changesets for version management
+- [ ] Add quality gates (coverage threshold, linting, etc.)
+
+### Documentation
+- [ ] Create comprehensive README.md with installation instructions
+- [ ] Add CONTRIBUTING.md with development setup
+- [ ] Document testing commands and workflows
+- [ ] Create initial plugin documentation in docs-site
+
+---
+
+## Milestone 2: Floating Widget Component
+
+### Component Structure & Storybook
+- [ ] **TEST**: Widget component renders correctly
+  ```typescript
+  test('FeedbackWidget renders with default props', async () => {
+    const container = await AstroContainer.create();
+    const result = await container.renderToString(FeedbackWidget);
+    expect(result).toContain('data-testid="feedback-widget"');
+    expect(result).toContain('Feedback');
+  });
+  ```
+- [ ] Create `FeedbackWidget.astro` component
+- [ ] Create Storybook story for widget with multiple variants
+- [ ] Add basic HTML structure with accessibility attributes
+- [ ] Make test pass
+
+### Styling and Positioning
+- [ ] **TEST**: Widget has correct CSS positioning and theming
+  ```typescript
+  test('widget uses Starlight CSS variables and positioning', async () => {
+    const result = await renderComponent(FeedbackWidget);
+    expect(result).toContain('var(--sl-color-');
+    expect(result).toMatch(/position:\s*fixed/);
+  });
+  ```
+- [ ] Add CSS with fixed bottom-right positioning
+- [ ] Use Starlight CSS variables for theming
+- [ ] Add dark/light mode support
+- [ ] Ensure responsive behavior with container queries
+- [ ] Make styling test pass
+
+### Client-Side Hydration
+- [ ] **TEST**: Widget becomes interactive after hydration
+  ```typescript
+  test('widget responds to interactions in browser', async ({ page }) => {
+    await page.goto('http://localhost:4321/docs/getting-started');
+    await page.waitForLoadState('networkidle');
+    
+    const widget = page.getByTestId('feedback-widget');
+    await expect(widget).toBeVisible();
+    
+    await widget.click();
+    // Should trigger modal open
+  });
+  ```
+- [ ] Add `client:idle` hydration directive
+- [ ] Implement click handler with state management
+- [ ] Add keyboard navigation support (Tab, Enter, Space)
+- [ ] Add focus indicators
+- [ ] Make interaction test pass
+
+### Accessibility & Performance
+- [ ] **TEST**: Widget meets WCAG 2.2 AA standards
+  ```typescript
+  test('widget is accessible and performant', async ({ page }) => {
+    await page.goto('http://localhost:4321/docs/getting-started');
+    
+    // Accessibility testing
+    const accessibilitySnapshot = await page.accessibility.snapshot();
+    expect(accessibilitySnapshot).toMatchAccessibilityTree();
+    
+    // Performance testing
+    const metrics = await page.evaluate(() => performance.getEntriesByType('navigation'));
+    expect(metrics[0].loadEventEnd - metrics[0].loadEventStart).toBeLessThan(100);
+  });
+  ```
+- [ ] Add proper ARIA labels and roles
+- [ ] Ensure keyboard navigation works
+- [ ] Test with automated accessibility tools (axe-core)
+- [ ] Optimize for Core Web Vitals
+- [ ] Make accessibility and performance test pass
+
+---
+
+## Milestone 3: Feedback Modal & Form UI
+
+### Modal Component Structure & Stories
+- [ ] **TEST**: Modal renders with proper form fields
+  ```typescript
+  test('FeedbackModal renders with categories and form fields', async () => {
+    const result = await renderComponent(FeedbackModal, {
+      props: { 
+        isOpen: true, 
+        categories: ['Typo', 'Confusing'] 
+      }
+    });
+    expect(result).toContain('data-testid="feedback-modal"');
+    expect(result).toContain('<option value="Typo">');
+  });
+  ```
+- [ ] Create `FeedbackModal.astro` component
+- [ ] Create comprehensive Storybook stories (open/closed, different states)
+- [ ] Add form HTML structure with proper semantic markup
+- [ ] Make test pass
+
+### Form Fields and Validation
+- [ ] **TEST**: Form includes all required fields with validation
+  ```typescript
+  test('modal form has required fields and validation', async () => {
+    const result = await renderComponent(FeedbackModal, {
+      props: { categories: ['Typo', 'Confusing', 'Other'] }
+    });
+    
+    expect(result).toContain('name="category"');
+    expect(result).toContain('name="comment"');
+    expect(result).toContain('name="suggestedTag"');
+    expect(result).toContain('required');
+  });
+  ```
+- [ ] Add category dropdown with configurable options
+- [ ] Add comment textarea with character limit
+- [ ] Add suggested tag input (conditional on "Other" category)
+- [ ] Add client-side validation with Zod schemas
+- [ ] Add real-time validation feedback
+- [ ] Make form fields test pass
+
+### Modal Behavior & Focus Management
+- [ ] **TEST**: Modal opens/closes with proper focus management
+  ```typescript
+  test('modal manages focus correctly', async ({ page }) => {
+    await page.goto('http://localhost:4321/docs/getting-started');
+    
+    // Open modal
+    await page.getByTestId('feedback-widget').click();
+    const modal = page.getByTestId('feedback-modal');
+    await expect(modal).toBeVisible();
+    
+    // First field should be focused
+    await expect(page.getByRole('combobox', { name: 'Category' })).toBeFocused();
+    
+    // ESC closes modal
+    await page.keyboard.press('Escape');
+    await expect(modal).not.toBeVisible();
+    
+    // Focus returns to widget
+    await expect(page.getByTestId('feedback-widget')).toBeFocused();
+  });
+  ```
+- [ ] Implement modal open/close state management
+- [ ] Add ESC key close functionality
+- [ ] Add backdrop click close functionality
+- [ ] Add focus trap inside modal
+- [ ] Return focus to trigger element on close
+- [ ] Add scroll lock when modal is open
+- [ ] Make modal behavior test pass
+
+### Form Submission Handling
+- [ ] **TEST**: Form submission shows proper loading and error states
+  ```typescript
+  test('form submission handles all states correctly', async ({ page }) => {
+    await page.goto('http://localhost:4321/docs/getting-started');
+    await page.getByTestId('feedback-widget').click();
+    
+    await page.selectOption('[name="category"]', 'Typo');
+    await page.fill('[name="comment"]', 'Test comment');
+    await page.click('[type="submit"]');
+    
+    // Should show loading state
+    await expect(page.getByTestId('loading-spinner')).toBeVisible();
+    
+    // After success, should show success message
+    await expect(page.getByTestId('success-message')).toBeVisible();
+  });
+  ```
+- [ ] Add form submit event handler with preventDefault
+- [ ] Implement loading state UI with spinner
+- [ ] Add success state with confirmation message
+- [ ] Add error state handling with retry option
+- [ ] Add form reset after successful submission
+- [ ] Make submission handling test pass
+
+---
+
+## Milestone 4: Frontend->Backend Submission Logic
+
+### API Endpoint Setup
+- [ ] **TEST**: API endpoint responds correctly
+  ```typescript
+  test('POST /api/feedback returns success response', async () => {
+    const response = await fetch('http://localhost:4321/api/feedback', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        page: '/docs/getting-started',
+        category: 'Typo',
+        comment: 'Test comment'
+      })
+    });
+    
+    expect(response.status).toBe(200);
+    const data = await response.json();
+    expect(data).toHaveProperty('success', true);
+  });
+  ```
+- [ ] Create `src/pages/api/feedback.ts` in docs-site
+- [ ] Create basic endpoint handler in plugin package
+- [ ] Return success response for now (no actual storage yet)
+- [ ] Add proper CORS headers
+- [ ] Make API endpoint test pass
+
+### Frontend Integration with Error Handling
+- [ ] **TEST**: Form submits data to API with proper error handling
+  ```typescript
+  test('form handles API success and error responses', async () => {
+    // Mock successful response
+    server.use(
+      http.post('http://localhost:4321/api/feedback', () => {
+        return HttpResponse.json({ success: true });
+      })
+    );
+    
+    const { page } = await setupE2ETest();
+    await page.goto('/docs/getting-started');
+    
+    // Fill and submit form
+    await page.getByTestId('feedback-widget').click();
+    await page.selectOption('[name="category"]', 'Typo');
+    await page.fill('[name="comment"]', 'Test comment');
+    await page.click('[type="submit"]');
+    
+    // Verify success state
+    await expect(page.getByTestId('success-message')).toBeVisible();
+  });
+  ```
+- [ ] Implement fetch call in modal component
+- [ ] Add proper error handling with user-friendly messages
+- [ ] Add retry mechanism for network failures
+- [ ] Add success message display
+- [ ] Add loading state management
+- [ ] Make frontend integration test pass
+
+### Data Structure Definition with Zod
+- [ ] **TEST**: Feedback data validates correctly
+  ```typescript
+  test('FeedbackData schema validates correctly', () => {
+    const validFeedback: FeedbackData = {
+      page: '/docs/getting-started',
+      category: 'Typo',
+      comment: 'Test comment',
+      timestamp: new Date().toISOString(),
+      userAgent: 'test-agent',
+      highlightedText: 'selected text'
+    };
+    
+    expect(() => FeedbackSchema.parse(validFeedback)).not.toThrow();
+    
+    // Test invalid data
+    const invalidFeedback = { ...validFeedback, category: 'InvalidCategory' };
+    expect(() => FeedbackSchema.parse(invalidFeedback)).toThrow();
+  });
+  ```
+- [ ] Define comprehensive TypeScript interfaces for feedback data
+- [ ] Add Zod schemas for validation
+- [ ] Export types for use across packages
+- [ ] Add schema validation in API endpoint
+- [ ] Make data structure test pass
+
+---
+
+## Milestone 5: Backend Connectors Implementation
+
+### Connector Interface & Health Checks
+- [ ] **TEST**: Connector interface works with health monitoring
+  ```typescript
+  test('FeedbackStorage interface with health checks', async () => {
+    const mockConnector: FeedbackStorage = {
+      store: vi.fn().mockResolvedValue({ success: true, id: 'test-123' }),
+      health: vi.fn().mockResolvedValue(true)
+    };
+    
+    const feedback: FeedbackData = { /* valid feedback */ };
+    const result = await mockConnector.store(feedback);
+    
+    expect(result.success).toBe(true);
+    expect(result.id).toBe('test-123');
+    expect(await mockConnector.health()).toBe(true);
+  });
+  ```
+- [ ] Define `FeedbackStorage` interface with health checks
+- [ ] Create base connector types with proper error handling
+- [ ] Add connector health monitoring
+- [ ] Make interface test pass
+
+### Linear Connector with GraphQL
+- [ ] **TEST**: Linear connector creates issues with proper error handling
+  ```typescript
+  test('LinearConnector handles success and error cases', async () => {
+    // Mock successful Linear API response
+    server.use(
+      http.post('https://api.linear.app/graphql', () => {
+        return HttpResponse.json({
+          data: {
+            issueCreate: {
+              success: true,
+              issue: { id: 'test-123', title: 'Test Issue' }
+            }
+          }
+        });
+      })
+    );
+    
+    const connector = new LinearConnector({
+      apiKey: 'test-key',
+      teamId: 'test-team'
+    });
+    
+    const feedback: FeedbackData = { 
+      page: '/docs/test',
+      category: 'Typo',
+      comment: 'Test feedback'
+    };
+    
+    const result = await connector.store(feedback);
+    
+    expect(result.success).toBe(true);
+    expect(result.id).toBe('test-123');
+  });
+  ```
+- [ ] Implement `LinearConnector` class with GraphQL mutations
+- [ ] Add proper error handling and retry logic
+- [ ] Add rate limiting protection
+- [ ] Add health check implementation
+- [ ] Make Linear connector test pass
+
+### Astro DB Connector with Drizzle
+- [ ] **TEST**: Astro DB connector with schema and migrations
+  ```typescript
+  test('AstroDbConnector stores feedback with proper schema', async () => {
+    // Use real SQLite in-memory database
+    const sqlite = new Database(':memory:');
+    const db = drizzle(sqlite);
+    
+    // Run migrations
+    await migrate(db, { migrationsFolder: './drizzle' });
+    
+    const connector = new AstroDbConnector(db);
+    const feedback: FeedbackData = { 
+      page: '/docs/test',
+      category: 'Typo',
+      comment: 'Test feedback'
+    };
+    
+    const result = await connector.store(feedback);
+    
+    expect(result.success).toBe(true);
+    expect(result.id).toBeDefined();
+    
+    // Verify data was stored
+    const stored = await db.select().from(feedbackTable);
+    expect(stored).toHaveLength(1);
+    expect(stored[0].comment).toBe('Test feedback');
+  });
+  ```
+- [ ] Define Feedback table schema with Drizzle
+- [ ] Implement `AstroDbConnector` class
+- [ ] Add database integration to docs-site
+- [ ] Create and run migrations
+- [ ] Make Astro DB connector test pass
+
+### Endpoint Integration with Multiple Connectors
+- [ ] **TEST**: Endpoint orchestrates multiple connectors correctly
+  ```typescript
+  test('feedback endpoint handles multiple connector results', async () => {
+    const mockLinear = { 
+      store: vi.fn().mockResolvedValue({ success: true, id: 'linear-123' }),
+      health: vi.fn().mockResolvedValue(true)
+    };
+    const mockDb = { 
+      store: vi.fn().mockResolvedValue({ success: true, id: 'db-456' }),
+      health: vi.fn().mockResolvedValue(true)
+    };
+    
+    const response = await handleFeedbackSubmission(
+      new Request('http://localhost/api/feedback', {
+        method: 'POST',
+        body: JSON.stringify(testFeedback)
+      }),
+      { connectors: [mockLinear, mockDb] }
+    );
+    
+    expect(response.status).toBe(200);
+    expect(mockLinear.store).toHaveBeenCalled();
+    expect(mockDb.store).toHaveBeenCalled();
+    
+    const result = await response.json();
+    expect(result.success).toBe(true);
+    expect(result.results).toHaveLength(2);
+  });
+  ```
+- [ ] Implement connector orchestration in endpoint
+- [ ] Add proper error handling (continue if one fails)
+- [ ] Add structured logging with correlation IDs
+- [ ] Add performance monitoring
+- [ ] Make endpoint integration test pass
+
+---
+
+## Milestone 6: Auth0 Integration
+
+### Auth Interface & JWT Validation
+- [ ] **TEST**: Auth provider interface validates tokens correctly
+  ```typescript
+  test('AuthProvider interface validates JWT tokens', async () => {
+    const mockAuth: AuthProvider = {
+      getCurrentUser: vi.fn().mockResolvedValue({
+        id: 'user-123',
+        email: 'test@example.com',
+        name: 'Test User'
+      }),
+      validateToken: vi.fn().mockResolvedValue(true)
+    };
+    
+    const request = new Request('http://localhost', {
+      headers: { Authorization: 'Bearer test-token' }
+    });
+    
+    const user = await mockAuth.getCurrentUser(request);
+    expect(user).toHaveProperty('email', 'test@example.com');
+    
+    const isValid = await mockAuth.validateToken('test-token');
+    expect(isValid).toBe(true);
+  });
+  ```
+- [ ] Define `AuthProvider` interface with JWT validation
+- [ ] Create base auth types and utilities
+- [ ] Add JWT token validation utilities
+- [ ] Make auth interface test pass
+
+### Auth0 Implementation with SPA SDK
+- [ ] **TEST**: Auth0 provider integrates with SPA SDK correctly
+  ```typescript
+  test('Auth0Provider works with SPA SDK', async () => {
+    // Mock Auth0 API responses
+    server.use(
+      http.get('https://dev-example.auth0.com/userinfo', () => {
+        return HttpResponse.json({
+          sub: 'auth0|123',
+          email: 'test@example.com',
+          name: 'Test User'
+        });
+      })
+    );
+    
+    const auth0 = new Auth0Provider({
+      domain: 'dev-example.auth0.com',
+      clientId: 'test-client-id',
+      audience: 'https://api.example.com'
+    });
+    
+    const request = new Request('http://localhost', {
+      headers: { Authorization: 'Bearer valid-token' }
+    });
+    
+    const user = await auth0.getCurrentUser(request);
+    expect(user).toHaveProperty('email', 'test@example.com');
+  });
+  ```
+- [ ] Implement `Auth0Provider` class with SPA SDK
+- [ ] Add JWT token validation with Auth0 libraries
+- [ ] Add Auth0 API integration for user info
+- [ ] Configure Auth0 in docs-site for testing
+- [ ] Make Auth0 provider test pass
+
+### Anonymous Fallback & Session Management
+- [ ] **TEST**: System handles anonymous and authenticated users
+  ```typescript
+  test('feedback works for both anonymous and authenticated users', async () => {
+    // Test anonymous submission
+    const anonResponse = await handleFeedbackSubmission(
+      new Request('http://localhost/api/feedback', {
+        method: 'POST',
+        body: JSON.stringify(testFeedback)
+        // No Authorization header
+      })
+    );
+    
+    expect(anonResponse.status).toBe(200);
+    
+    // Test authenticated submission
+    const authResponse = await handleFeedbackSubmission(
+      new Request('http://localhost/api/feedback', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer valid-token' },
+        body: JSON.stringify(testFeedback)
+      })
+    );
+    
+    expect(authResponse.status).toBe(200);
+  });
+  ```
+- [ ] Ensure anonymous submissions work seamlessly
+- [ ] Add session management for authenticated users
+- [ ] Add proper logging for anonymous vs authenticated
+- [ ] Add user info attachment to feedback data
+- [ ] Make anonymous fallback test pass
+
+Remember: Each checkbox should only be checked AFTER the corresponding test passes! 
