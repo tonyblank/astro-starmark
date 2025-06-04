@@ -1,0 +1,61 @@
+{
+  "name": "starmark-integration",
+  "version": "0.0.1",
+  "description": "Astro StarMark feedback integration plugin",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "keywords": [
+    "astro",
+    "feedback",
+    "starlight",
+    "plugin",
+    "linear",
+    "auth0"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "test:unit": "vitest run --config vitest.unit.config.ts",
+    "test:component": "vitest run --config vitest.component.config.ts",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "test:watch": "vitest",
+    "lint": "eslint src --ext .ts,.tsx,.astro",
+    "lint:fix": "eslint src --ext .ts,.tsx,.astro --fix",
+    "format": "prettier --write \"src/**/*.{ts,tsx,astro,json,md}\"",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx,astro,json,md}\"",
+    "type-check": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "astro": "^4.15.0",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@astrojs/starlight": "^0.25.0",
+    "@types/node": "^20.11.5",
+    "@typescript-eslint/eslint-plugin": "^6.19.1",
+    "@typescript-eslint/parser": "^6.19.1",
+    "@vitest/ui": "^1.2.1",
+    "eslint": "^8.56.0",
+    "eslint-plugin-astro": "^0.31.0",
+    "prettier": "^3.2.4",
+    "prettier-plugin-astro": "^0.13.0",
+    "tsup": "^8.0.1",
+    "typescript": "^5.3.3",
+    "vitest": "^1.2.1"
+  },
+  "peerDependencies": {
+    "astro": "^4.0.0"
+  }
+} 

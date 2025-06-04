@@ -11,6 +11,11 @@ node_modules/
 # Build outputs
 dist/
 .astro/
+build/
+out/
+
+# Turborepo
+.turbo/
 
 # Runtime data
 pids
@@ -46,10 +51,17 @@ yarn-error.log*
 lerna-debug.log*
 
 # Playwright
-/test-results/
-/playwright-report/
-/playwright/.cache/
+test-results/
+playwright-report/
+.playwright/
+browsers/
 
 # Temporary files
 *.tmp
-*.temp 
+*.temp
+
+# TypeScript
+*.tsbuildinfo
+
+# Vitest
+coverage.json 

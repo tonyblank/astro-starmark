@@ -1,0 +1,38 @@
+{
+  "name": "starmark.dev",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev",
+    "start": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "test": "echo 'No unit tests for starmark.dev - use test:e2e for E2E tests'",
+    "test:e2e": "playwright test",
+    "lint": "eslint src --ext .ts,.tsx,.astro,.js,.jsx",
+    "lint:fix": "eslint src --ext .ts,.tsx,.astro,.js,.jsx --fix",
+    "format": "prettier --write \"src/**/*.{ts,tsx,astro,js,jsx,json,md,mdx}\"",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx,astro,js,jsx,json,md,mdx}\"",
+    "type-check": "astro check",
+    "clean": "rm -rf dist .astro"
+  },
+  "dependencies": {
+    "@astrojs/starlight": "^0.25.0",
+    "astro": "^4.15.0",
+    "starmark-integration": "workspace:*"
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.5.6",
+    "@playwright/test": "^1.41.2",
+    "@types/node": "^20.11.5",
+    "@typescript-eslint/eslint-plugin": "^6.19.1",
+    "@typescript-eslint/parser": "^6.19.1",
+    "eslint": "^8.56.0",
+    "eslint-plugin-astro": "^0.31.0",
+    "prettier": "^3.2.4",
+    "prettier-plugin-astro": "^0.13.0",
+    "typescript": "^5.3.3",
+    "vitest": "^1.2.1"
+  }
+} 

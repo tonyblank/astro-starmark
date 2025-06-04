@@ -1,0 +1,40 @@
+{
+  "name": "starmark",
+  "version": "0.0.0",
+  "description": "Astro StarMark - Feedback collection plugin for documentation sites with Linear, GitHub, and Auth0 integration",
+  "type": "module",
+  "private": true,
+  "engines": {
+    "node": ">=18.0.0",
+    "pnpm": ">=8.0.0"
+  },
+  "packageManager": "pnpm@8.15.1",
+  "scripts": {
+    "build": "turbo build",
+    "dev": "turbo dev",
+    "test": "turbo test",
+    "test:unit": "turbo test:unit",
+    "test:component": "turbo test:component", 
+    "test:integration": "turbo test:integration",
+    "test:e2e": "turbo test:e2e",
+    "test:watch": "turbo test:unit --watch",
+    "test:ci": "turbo test --coverage --reporter=verbose",
+    "lint": "turbo lint",
+    "lint:fix": "turbo lint:fix",
+    "format": "turbo format",
+    "format:check": "turbo format:check",
+    "type-check": "turbo type-check",
+    "clean": "turbo clean",
+    "changeset": "changeset",
+    "changeset:version": "changeset version",
+    "changeset:publish": "changeset publish"
+  },
+  "devDependencies": {
+    "@changesets/cli": "^2.27.1",
+    "turbo": "^1.12.4"
+  },
+  "workspaces": [
+    "starmark-integration",
+    "starmark.dev"
+  ]
+} 
