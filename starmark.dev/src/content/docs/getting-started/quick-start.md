@@ -33,15 +33,15 @@ yarn add starmark-integration
 Add StarMark to your Astro configuration:
 
 ```js title="astro.config.mjs"
-import { defineConfig } from 'astro/config';
-import starmark from 'starmark-integration';
+import { defineConfig } from "astro/config";
+import starmark from "starmark-integration";
 
 export default defineConfig({
   integrations: [
     starmark({
       ui: {
-        categories: ['Bug', 'Feature Request', 'Question', 'Typo'],
-        position: 'bottom-right',
+        categories: ["Bug", "Feature Request", "Question", "Typo"],
+        position: "bottom-right",
       },
     }),
   ],
@@ -53,19 +53,19 @@ export default defineConfig({
 If you're using Starlight, the integration works seamlessly:
 
 ```js title="astro.config.mjs"
-import { defineConfig } from 'astro/config';
-import starlight from '@astrojs/starlight';
-import starmark from 'starmark-integration';
+import { defineConfig } from "astro/config";
+import starlight from "@astrojs/starlight";
+import starmark from "starmark-integration";
 
 export default defineConfig({
   integrations: [
     starlight({
-      title: 'My Docs',
+      title: "My Docs",
       // ... your starlight config
     }),
     starmark({
       ui: {
-        categories: ['Bug', 'Documentation Issue', 'Feature Request'],
+        categories: ["Bug", "Documentation Issue", "Feature Request"],
       },
     }),
   ],
@@ -75,6 +75,7 @@ export default defineConfig({
 ## Test Your Setup
 
 1. Start your development server:
+
    ```bash
    npm run dev
    ```
@@ -105,4 +106,4 @@ export default defineConfig({
 2. Clear your build cache: `rm -rf dist .astro node_modules/.cache`
 3. Reinstall dependencies: `npm install`
 
-Still having issues? Feel free to use the feedback widget on this page to report problems! 
+Still having issues? Feel free to use the feedback widget on this page to report problems!

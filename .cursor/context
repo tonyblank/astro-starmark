@@ -39,6 +39,9 @@ Successfully implemented the scaffold integration for StarMark. All major compon
   - Node.js 18, 20, 22 testing across Ubuntu, Windows, macOS
   - Security audit, build verification, E2E testing
   - Codecov integration for coverage reporting
+  - **Updated action versions to latest stable releases**:
+    - codecov/codecov-action@v5 (was v3)
+    - actions/upload-artifact@v4 (was v3)
 
 - [x] **Complete project documentation** ✅
   - Comprehensive README.md with installation instructions
@@ -61,8 +64,15 @@ Successfully implemented the scaffold integration for StarMark. All major compon
 - `starmark.dev/tsconfig.json` - TypeScript configuration for docs site
 - `starmark.dev/playwright.config.ts` - E2E test configuration
 - `starmark.dev/e2e/integration-loads.spec.ts` - E2E test (browser install required)
-- `.github/workflows/ci.yml` - CI/CD pipeline with Codecov integration
+- `.github/workflows/ci.yml` - CI/CD pipeline with Codecov integration (updated to latest action versions)
 - `CONTRIBUTING.md` - Comprehensive development guide
+
+**Recent Fixes Applied:**
+- **CI Action Updates**: Updated codecov-action from v3→v5 and upload-artifact from v3→v4 to fix CI failures
+- **License Compliance**: Added MIT license to all package.json files
+- **TypeScript Coverage**: Fixed TypeScript include patterns and type guards
+- **Environment Security**: Made debug conditional and replaced example credentials
+- **Git Ignore**: Updated patterns for better build artifact exclusion
 
 **Technical Achievements:**
 - ✅ All builds pass: `pnpm build` successful
@@ -71,7 +81,7 @@ Successfully implemented the scaffold integration for StarMark. All major compon
 - ✅ Proper TypeScript: Full type safety with exports and declarations
 - ✅ Modern tooling: Turborepo, Vitest, Playwright, ESM, Zod validation
 - ✅ Documentation site: Functional Starlight site with integration dogfooding
-- ✅ CI/CD ready: GitHub Actions workflow for automated testing with coverage reporting
+- ✅ CI/CD ready: GitHub Actions workflow for automated testing with coverage reporting (latest action versions)
 - ✅ Complete documentation: README.md and CONTRIBUTING.md with all necessary information
 
 **Key Design Decisions:**
@@ -81,6 +91,7 @@ Successfully implemented the scaffold integration for StarMark. All major compon
 - Created comprehensive test coverage including error scenarios
 - Configured Turborepo for efficient monorepo builds and caching
 - Removed Storybook and Chromatic as testing requirements per project decisions
+- Updated CI to use latest stable action versions for compatibility and performance
 
 ### 🎯 Next Milestone: Floating Widget Component
 Ready to begin milestone 2 development.
@@ -481,7 +492,7 @@ describe('ComponentName', () => {
 ```bash
 # Linear integration
 LINEAR_API_KEY=lin_api_your_key_here
-LINEAR_TEAM_ID=0c581c9a-750a-4bfe-bec3-c7021606c674
+LINEAR_TEAM_ID=your-team-id-here
 
 # Auth0 integration (free plan)
 AUTH0_DOMAIN=your-tenant.auth0.com
@@ -531,7 +542,7 @@ PUBLIC_SITE_DOMAIN=starmark.dev
 }
 ```
 
-### GitHub Actions Matrix
+### GitHub Actions Matrix (Updated Actions)
 ```yaml
 strategy:
   matrix:
@@ -541,6 +552,10 @@ strategy:
       - node-version: 20
         os: ubuntu-latest
         primary: true
+
+# Latest action versions used:
+- uses: codecov/codecov-action@v5  # Updated from v3
+- uses: actions/upload-artifact@v4  # Updated from v3
 ```
 
 ## Branch & Review Workflow

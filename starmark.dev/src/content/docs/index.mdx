@@ -3,7 +3,7 @@ title: Welcome to StarMark
 description: Collect feedback seamlessly in your Astro documentation sites
 ---
 
-import { Card, CardGrid } from '@astrojs/starlight/components';
+import { Card, CardGrid } from "@astrojs/starlight/components";
 
 # Welcome to StarMark
 
@@ -13,19 +13,22 @@ StarMark is a powerful feedback collection integration for Astro documentation s
 
 <CardGrid>
   <Card title="Easy Integration" icon="rocket">
-    Simple one-line integration with your Astro site. Works perfectly with Starlight documentation sites.
+    Simple one-line integration with your Astro site. Works perfectly with
+    Starlight documentation sites.
   </Card>
-  
-  <Card title="Multiple Backends" icon="setting">
-    Connect to Linear, GitHub Issues, or any custom API endpoint to receive feedback submissions.
-  </Card>
-  
-  <Card title="User Authentication" icon="approve-check">
-    Optional Auth0 integration for authenticated feedback with user context.
-  </Card>
-  
+
+<Card title="Multiple Backends" icon="setting">
+  Connect to Linear, GitHub Issues, or any custom API endpoint to receive
+  feedback submissions.
+</Card>
+
+<Card title="User Authentication" icon="approve-check">
+  Optional Auth0 integration for authenticated feedback with user context.
+</Card>
+
   <Card title="Customizable UI" icon="puzzle">
-    Fully customizable feedback widget that matches your site's design and branding.
+    Fully customizable feedback widget that matches your site's design and
+    branding.
   </Card>
 </CardGrid>
 
@@ -34,21 +37,23 @@ StarMark is a powerful feedback collection integration for Astro documentation s
 Get started with StarMark in just a few minutes:
 
 1. **Install the package**
+
    ```bash
    npm install starmark-integration
    ```
 
 2. **Add to your Astro config**
+
    ```js
    // astro.config.mjs
-   import { defineConfig } from 'astro/config';
-   import starmark from 'starmark-integration';
-   
+   import { defineConfig } from "astro/config";
+   import starmark from "starmark-integration";
+
    export default defineConfig({
      integrations: [
        starmark({
          ui: {
-           categories: ['Bug', 'Feature Request', 'Question'],
+           categories: ["Bug", "Feature Request", "Question"],
          },
        }),
      ],
@@ -75,4 +80,4 @@ Documentation sites are crucial for user experience, but collecting actionable f
 
 ---
 
-*StarMark is open source and built with modern web standards. Contributions welcome!* 
+_StarMark is open source and built with modern web standards. Contributions welcome!_

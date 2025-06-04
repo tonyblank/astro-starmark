@@ -2,6 +2,7 @@
   "name": "starmark",
   "version": "0.0.0",
   "description": "Astro StarMark - Feedback collection plugin for documentation sites with Linear, GitHub, and Auth0 integration",
+  "license": "MIT",
   "type": "module",
   "private": true,
   "engines": {

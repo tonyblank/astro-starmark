@@ -9,9 +9,13 @@ export default defineConfig({
     starlight({
       title: 'StarMark',
       description: 'Feedback collection for Astro documentation sites',
-      social: {
-        github: 'https://github.com/yourusername/astro-starmark',
-      },
+      social: [
+        {
+          icon: 'github',
+          label: 'GitHub',
+          href: 'https://github.com/yourusername/astro-starmark',
+        },
+      ],
       sidebar: [
         {
           label: 'Getting Started',
@@ -32,27 +36,38 @@ export default defineConfig({
         {
           label: 'API Reference',
           items: [
-            { label: 'Configuration Options', link: '/api/configuration/' },
-            { label: 'Events', link: '/api/events/' },
-          ],
-        },
-        {
-          label: 'Examples',
-          items: [
-            { label: 'Basic Example', link: '/examples/basic/' },
-            { label: 'Custom Theme', link: '/examples/custom-theme/' },
+            { label: 'Integration Options', link: '/reference/options/' },
+            { label: 'Components', link: '/reference/components/' },
           ],
         },
       ],
     }),
-    // Include StarMark integration for dogfooding
     starmark({
-      debug: true,
-      ui: {
-        categories: ['Bug', 'Feature Request', 'Documentation', 'Question'],
-        position: 'bottom-right',
+      linear: {
+        apiKey: process.env.LINEAR_API_KEY || '',
+        teamId: process.env.LINEAR_TEAM_ID || '',
       },
+      auth0: {
+        domain: process.env.AUTH0_DOMAIN || '',
+        clientId: process.env.AUTH0_CLIENT_ID || '',
+        clientSecret: process.env.AUTH0_CLIENT_SECRET || '',
+      },
+      ui: {
+        position: 'bottom-right',
+        theme: { 
+          primary: '#3b82f6',
+          background: '#ffffff' 
+        },
+        showAvatar: true,
+      },
+      debug: true,
     }),
   ],
   output: 'static', // For now, we'll use static output for milestone 1
+  build: {
+    inlineStylesheets: 'auto',
+  },
+  typescript: {
+    checkJs: true,
+  },
 }); 

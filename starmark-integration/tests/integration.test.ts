@@ -94,7 +94,10 @@ describe('StarMark Integration', () => {
 
     // Should not throw when calling the hook
     expect(() => {
-      integration.hooks['astro:config:setup'](mockContext as any);
+      const setupHook = integration.hooks['astro:config:setup'];
+      if (setupHook) {
+        setupHook(mockContext as any);
+      }
     }).not.toThrow();
   });
 
@@ -118,9 +121,12 @@ describe('StarMark Integration', () => {
       },
     };
 
-    // Should not throw even with invalid config
+    // Should throw with invalid config (fail-fast behavior)
     expect(() => {
-      integration.hooks['astro:config:setup'](mockContext as any);
-    }).not.toThrow();
+      const setupHook = integration.hooks['astro:config:setup'];
+      if (setupHook) {
+        setupHook(mockContext as any);
+      }
+    }).toThrow('StarMark integration failed: Invalid configuration');
   });
 }); 

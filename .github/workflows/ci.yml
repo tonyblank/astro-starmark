@@ -69,14 +69,14 @@ jobs:
         if: matrix.primary
 
       - name: Upload test coverage
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v5
         if: matrix.primary
         with:
           files: ./coverage/lcov.info
           fail_ci_if_error: false
 
       - name: Upload Playwright report
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         if: always() && matrix.primary
         with:
           name: playwright-report
