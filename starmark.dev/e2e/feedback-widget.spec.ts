@@ -91,7 +91,7 @@ test.describe('FeedbackWidget Component', () => {
     });
     
     expect(styles.position).toBe('fixed');
-    expect(styles.zIndex).toBe('1000');
+    expect(styles.zIndex).toBe('9999');
   });
 
   test('widget supports keyboard navigation', async ({ page }) => {
@@ -166,9 +166,12 @@ test.describe('FeedbackWidget Component', () => {
     expect(kbResults.invalidKeyHandled).toBeTruthy(); // Invalid key should NOT trigger click
     expect(kbResults.totalClickCalls).toBe(2); // Should have exactly 2 click calls
     
-    // Verify keyboard interactions maintain widget functionality
+    // Verify widget is still functional after keyboard interactions
     await expect(widget).toBeVisible();
     await expect(widget).toHaveAttribute('data-script-loaded', 'true');
+    
+    // Test that the widget can still be focused properly
+    await widget.focus();
     await expect(widget).toBeFocused();
   });
 

@@ -1,4 +1,6 @@
 ---
+import "../types.ts"; // Import for global Window interface extensions
+
 export interface Props {
   /**
    * Categories available in the feedback form
@@ -50,7 +52,7 @@ const widgetCategories = categories;
     font-family: var(--sl-font);
     font-size: var(--sl-text-sm);
     font-weight: 600;
-    z-index: 1000;
+    z-index: 9999;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
     transition: all 0.2s ease;
     display: flex;
@@ -139,11 +141,10 @@ const widgetCategories = categories;
 <script>
   // Client-side interactivity with proper cleanup
   (function () {
-    // Use type assertion to safely access window property
-    const windowWithStarmark = window as any;
+    // Use properly typed window interface
 
     // Prevent multiple initializations
-    if (windowWithStarmark.starmarkFeedbackWidget) {
+    if (window.starmarkFeedbackWidget) {
       return;
     }
 
@@ -155,7 +156,19 @@ const widgetCategories = categories;
     function handleClick() {
       if (!widget) return;
 
-      // TODO: Open feedback modal
+      // Open feedback modal if available
+      if (window.starmarkFeedbackModal) {
+        window.starmarkFeedbackModal.open();
+      } else {
+        // Modal not ready yet, try again after a short delay
+        setTimeout(() => {
+          if (window.starmarkFeedbackModal) {
+            window.starmarkFeedbackModal.open();
+          } else {
+            console.warn("StarMark: Feedback modal not available");
+          }
+        }, 100);
+      }
     }
 
     function handleKeydown(event: KeyboardEvent) {
@@ -209,7 +222,7 @@ const widgetCategories = categories;
     }
 
     // Expose cleanup function globally for proper teardown
-    windowWithStarmark.starmarkFeedbackWidget = {
+    window.starmarkFeedbackWidget = {
       cleanup: cleanup,
       initialized: true,
     };

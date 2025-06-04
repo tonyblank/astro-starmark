@@ -62,7 +62,7 @@ describe('FeedbackWidget Component', () => {
       
       // Test positioning styles
       expect(computedStyles.position).toBe('fixed');
-      expect(computedStyles.zIndex).toBe('1000');
+      expect(computedStyles.zIndex).toBe('9999');
       
       // Test bottom-right positioning
       expect(computedStyles.bottom).toBe('24px');

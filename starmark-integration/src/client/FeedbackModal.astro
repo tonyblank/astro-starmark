@@ -1,0 +1,894 @@
+---
+import "../types.ts"; // Import for global Window interface extensions
+
+export interface Props {
+  /**
+   * Whether the modal is open
+   */
+  isOpen?: boolean;
+
+  /**
+   * Categories available in the feedback form
+   */
+  categories?: string[];
+
+  /**
+   * Callback when modal is closed
+   */
+  onClose?: () => void;
+
+  /**
+   * Callback when form is submitted
+   */
+  onSubmit?: () => Promise<void>;
+}
+
+const {
+  isOpen = false,
+  categories = [
+    "Bug",
+    "Feature Request",
+    "Question",
+    "Typo",
+    "Confusing",
+    "Other",
+  ],
+} = Astro.props;
+---
+
+<div
+  class={`feedback-modal ${isOpen ? "feedback-modal--open" : ""}`}
+  data-testid="feedback-modal"
+  role="dialog"
+  aria-modal="true"
+  aria-labelledby="modal-title"
+  aria-describedby="modal-description"
+  style={isOpen ? "display: flex;" : "display: none;"}
+>
+  <div class="feedback-modal__content">
+    <div class="feedback-modal__header">
+      <h2 id="modal-title" class="feedback-modal__title">
+        Share Your Feedback
+      </h2>
+      <button
+        type="button"
+        class="feedback-modal__close"
+        aria-label="Close feedback modal"
+        data-testid="close-modal"
+      >
+        <span aria-hidden="true">×</span>
+      </button>
+    </div>
+
+    <div id="modal-description" class="feedback-modal__description">
+      Help us improve this page by sharing your thoughts.
+    </div>
+
+    <form class="feedback-modal__form" data-state="idle">
+      <div class="feedback-modal__field">
+        <label for="feedback-category" class="feedback-modal__label">
+          Category <span class="feedback-modal__required">*</span>
+        </label>
+        <select
+          id="feedback-category"
+          name="category"
+          class="feedback-modal__select"
+          required
+          aria-describedby="category-error"
+        >
+          <option value="">Select a category...</option>
+          {
+            categories.map((category) => (
+              <option value={category}>{category}</option>
+            ))
+          }
+        </select>
+        <div
+          id="category-error"
+          class="feedback-modal__error"
+          aria-live="polite"
+        >
+        </div>
+      </div>
+
+      <div
+        class="feedback-modal__field feedback-modal__field--suggested-tag"
+        style="display: none;"
+      >
+        <label for="feedback-suggested-tag" class="feedback-modal__label">
+          Suggested category name
+        </label>
+        <input
+          id="feedback-suggested-tag"
+          name="suggestedTag"
+          type="text"
+          class="feedback-modal__input"
+          placeholder="What would you call this category?"
+          aria-describedby="tag-hint"
+        />
+        <div id="tag-hint" class="feedback-modal__hint">
+          Help us create a better category for this type of feedback
+        </div>
+      </div>
+
+      <div class="feedback-modal__field">
+        <label for="feedback-comment" class="feedback-modal__label">
+          Your feedback <span class="feedback-modal__required">*</span>
+        </label>
+        <textarea
+          id="feedback-comment"
+          name="comment"
+          class="feedback-modal__textarea"
+          rows="4"
+          maxlength="1000"
+          required
+          placeholder="Tell us what you think..."
+          aria-describedby="comment-counter comment-error"></textarea>
+        <div class="feedback-modal__meta">
+          <div
+            id="comment-counter"
+            class="feedback-modal__counter"
+            data-testid="character-counter"
+          >
+            <span class="feedback-modal__counter-current">0</span> / 1000
+          </div>
+        </div>
+        <div
+          id="comment-error"
+          class="feedback-modal__error"
+          aria-live="polite"
+        >
+        </div>
+      </div>
+
+      <div class="feedback-modal__actions">
+        <button type="submit" class="feedback-modal__submit">
+          <span class="feedback-modal__submit-text">Send Feedback</span>
+          <span
+            class="feedback-modal__spinner"
+            data-testid="loading-spinner"
+            aria-hidden="true"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+              <circle
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-dasharray="31.416"
+                stroke-dashoffset="31.416"
+              >
+                <animate
+                  attributeName="stroke-dasharray"
+                  dur="2s"
+                  values="0 31.416;15.708 15.708;0 31.416"
+                  repeatCount="indefinite"></animate>
+                <animate
+                  attributeName="stroke-dashoffset"
+                  dur="2s"
+                  values="0;-15.708;-31.416"
+                  repeatCount="indefinite"></animate>
+              </circle>
+            </svg>
+          </span>
+        </button>
+      </div>
+
+      <!-- Success Message -->
+      <div
+        class="feedback-modal__message feedback-modal__message--success"
+        data-testid="success-message"
+        aria-live="polite"
+      >
+        <div class="feedback-modal__message-icon">✓</div>
+        <div class="feedback-modal__message-content">
+          <h3>Thank you for your feedback!</h3>
+          <p>Your input helps us improve the documentation.</p>
+        </div>
+      </div>
+
+      <!-- Error Message -->
+      <div
+        class="feedback-modal__message feedback-modal__message--error"
+        data-testid="error-message"
+        aria-live="polite"
+      >
+        <div class="feedback-modal__message-icon">⚠</div>
+        <div class="feedback-modal__message-content">
+          <h3>Something went wrong</h3>
+          <p>We couldn't submit your feedback. Please try again.</p>
+          <button
+            type="button"
+            class="feedback-modal__retry"
+            data-testid="retry-button"
+          >
+            Try Again
+          </button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<style>
+  .feedback-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 999999;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    box-sizing: border-box;
+    background: rgba(0, 0, 0, 0.5);
+  }
+
+  .feedback-modal--open {
+    display: flex;
+  }
+
+  .feedback-modal__content {
+    position: relative;
+    background: var(--sl-color-white);
+    border-radius: 12px;
+    max-width: 480px;
+    width: 100%;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+    display: flex;
+    flex-direction: column;
+  }
+
+  .feedback-modal__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 24px 0;
+    border-bottom: 1px solid var(--sl-color-gray-2);
+    margin-bottom: 20px;
+  }
+
+  .feedback-modal__title {
+    margin: 0;
+    font-size: var(--sl-text-lg);
+    font-weight: 600;
+    color: var(--sl-color-black);
+    font-family: var(--sl-font);
+  }
+
+  .feedback-modal__close {
+    background: none;
+    border: none;
+    font-size: 24px;
+    cursor: pointer;
+    padding: 4px;
+    color: var(--sl-color-gray-6);
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+  }
+
+  .feedback-modal__close:hover {
+    background: var(--sl-color-gray-1);
+    color: var(--sl-color-black);
+  }
+
+  .feedback-modal__close:focus {
+    outline: 2px solid var(--sl-color-accent);
+    outline-offset: 2px;
+  }
+
+  .feedback-modal__description {
+    padding: 0 24px;
+    margin-bottom: 24px;
+    color: var(--sl-color-gray-6);
+    font-size: var(--sl-text-sm);
+    line-height: 1.5;
+  }
+
+  .feedback-modal__form {
+    padding: 0 24px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .feedback-modal__field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .feedback-modal__field--suggested-tag {
+    display: none;
+  }
+
+  .feedback-modal__field--suggested-tag.feedback-modal__field--visible {
+    display: flex;
+  }
+
+  .feedback-modal__label {
+    font-weight: 500;
+    font-size: var(--sl-text-sm);
+    color: var(--sl-color-black);
+    font-family: var(--sl-font);
+  }
+
+  .feedback-modal__required {
+    color: #dc2626;
+  }
+
+  .feedback-modal__select,
+  .feedback-modal__input,
+  .feedback-modal__textarea {
+    padding: 10px 12px;
+    border: 1px solid var(--sl-color-gray-3);
+    border-radius: 6px;
+    font-size: var(--sl-text-base);
+    font-family: var(--sl-font);
+    background: var(--sl-color-white);
+    color: var(--sl-color-black);
+    transition: border-color 0.2s ease;
+  }
+
+  .feedback-modal__select:focus,
+  .feedback-modal__input:focus,
+  .feedback-modal__textarea:focus {
+    outline: none;
+    border-color: var(--sl-color-accent);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  }
+
+  .feedback-modal__textarea {
+    resize: vertical;
+    min-height: 100px;
+  }
+
+  .feedback-modal__meta {
+    display: flex;
+    justify-content: flex-end;
+  }
+
+  .feedback-modal__counter {
+    font-size: var(--sl-text-xs);
+    color: var(--sl-color-gray-6);
+  }
+
+  .feedback-modal__counter--warning {
+    color: #f59e0b;
+  }
+
+  .feedback-modal__counter--danger {
+    color: #dc2626;
+  }
+
+  .feedback-modal__hint {
+    font-size: var(--sl-text-xs);
+    color: var(--sl-color-gray-6);
+    margin-top: 4px;
+  }
+
+  .feedback-modal__error {
+    font-size: var(--sl-text-xs);
+    color: #dc2626;
+    margin-top: 4px;
+    min-height: 16px;
+  }
+
+  .feedback-modal__actions {
+    margin-top: 8px;
+  }
+
+  .feedback-modal__submit {
+    width: 100%;
+    background: var(--sl-color-accent);
+    color: var(--sl-color-white);
+    border: none;
+    border-radius: 6px;
+    padding: 12px 20px;
+    font-size: var(--sl-text-base);
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    font-family: var(--sl-font);
+  }
+
+  .feedback-modal__submit:hover:not(:disabled) {
+    background: var(--sl-color-accent-high);
+  }
+
+  .feedback-modal__submit:focus {
+    outline: 2px solid var(--sl-color-accent);
+    outline-offset: 2px;
+  }
+
+  .feedback-modal__submit:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  .feedback-modal__spinner {
+    display: none;
+  }
+
+  .feedback-modal__form[data-state="loading"] .feedback-modal__spinner {
+    display: block;
+  }
+
+  .feedback-modal__form[data-state="loading"] .feedback-modal__submit-text {
+    display: none;
+  }
+
+  .feedback-modal__message {
+    display: none;
+    padding: 16px;
+    border-radius: 8px;
+    margin-top: 16px;
+  }
+
+  .feedback-modal__message--success {
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    color: #166534;
+  }
+
+  .feedback-modal__message--error {
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    color: #991b1b;
+  }
+
+  .feedback-modal__form[data-state="success"] .feedback-modal__message--success,
+  .feedback-modal__form[data-state="error"] .feedback-modal__message--error {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .feedback-modal__message-icon {
+    font-size: 20px;
+    font-weight: bold;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+
+  .feedback-modal__message-content h3 {
+    margin: 0 0 4px;
+    font-size: var(--sl-text-sm);
+    font-weight: 600;
+  }
+
+  .feedback-modal__message-content p {
+    margin: 0 0 8px;
+    font-size: var(--sl-text-sm);
+  }
+
+  .feedback-modal__retry {
+    background: transparent;
+    border: 1px solid currentColor;
+    border-radius: 4px;
+    padding: 6px 12px;
+    font-size: var(--sl-text-xs);
+    cursor: pointer;
+    color: inherit;
+    font-family: var(--sl-font);
+  }
+
+  .feedback-modal__retry:hover {
+    background: currentColor;
+    color: var(--sl-color-white);
+  }
+
+  /* Dark mode support */
+  :global([data-theme="dark"]) .feedback-modal__content {
+    background: var(--sl-color-gray-1);
+    color: var(--sl-color-white);
+  }
+
+  :global([data-theme="dark"]) .feedback-modal__title {
+    color: var(--sl-color-white);
+  }
+
+  :global([data-theme="dark"]) .feedback-modal__select,
+  :global([data-theme="dark"]) .feedback-modal__input,
+  :global([data-theme="dark"]) .feedback-modal__textarea {
+    background: var(--sl-color-gray-2);
+    color: var(--sl-color-white);
+    border-color: var(--sl-color-gray-4);
+  }
+
+  /* Responsive behavior */
+  @media (max-width: 480px) {
+    .feedback-modal {
+      padding: 8px;
+    }
+
+    .feedback-modal__content {
+      max-height: 95vh;
+    }
+
+    .feedback-modal__header {
+      padding: 16px 20px 0;
+    }
+
+    .feedback-modal__description {
+      padding: 0 20px;
+    }
+
+    .feedback-modal__form {
+      padding: 0 20px 20px;
+    }
+  }
+
+  /* Reduced motion support */
+  @media (prefers-reduced-motion: reduce) {
+    .feedback-modal__submit,
+    .feedback-modal__close {
+      transition: none;
+    }
+  }
+
+  /* Print styles */
+  @media print {
+    .feedback-modal {
+      display: none;
+    }
+  }
+</style>
+
+<script>
+  // Client-side modal functionality
+  (function () {
+    // Use properly typed window interface
+
+    // Prevent multiple initializations
+    if (window.starmarkFeedbackModal) {
+      return;
+    }
+
+    let modal: HTMLElement | null = null;
+    let form: HTMLFormElement | null = null;
+    let categorySelect: HTMLSelectElement | null = null;
+    let suggestedTagField: HTMLElement | null = null;
+    let suggestedTagInput: HTMLInputElement | null = null;
+    let commentTextarea: HTMLTextAreaElement | null = null;
+    let characterCounter: HTMLElement | null = null;
+    let closeButton: HTMLButtonElement | null = null;
+    let submitButton: HTMLButtonElement | null = null;
+    let originalBodyOverflow = "";
+    let previouslyFocusedElement: HTMLElement | null = null;
+
+    // Form state
+    type FormState = "idle" | "loading" | "success" | "error";
+    let currentState: FormState = "idle";
+
+    function initializeModal() {
+      modal = document.querySelector(
+        '[data-testid="feedback-modal"]',
+      ) as HTMLElement;
+      if (!modal) return;
+
+      form = modal.querySelector(".feedback-modal__form") as HTMLFormElement;
+      categorySelect = modal.querySelector(
+        '[name="category"]',
+      ) as HTMLSelectElement;
+      suggestedTagField = modal.querySelector(
+        ".feedback-modal__field--suggested-tag",
+      ) as HTMLElement;
+      suggestedTagInput = modal.querySelector(
+        '[name="suggestedTag"]',
+      ) as HTMLInputElement;
+      commentTextarea = modal.querySelector(
+        '[name="comment"]',
+      ) as HTMLTextAreaElement;
+      characterCounter = modal.querySelector(
+        '[data-testid="character-counter"]',
+      ) as HTMLElement;
+      closeButton = modal.querySelector(
+        ".feedback-modal__close",
+      ) as HTMLButtonElement;
+      submitButton = modal.querySelector(
+        ".feedback-modal__submit",
+      ) as HTMLButtonElement;
+
+      setupEventListeners();
+      setupFocusTrap();
+    }
+
+    function setupEventListeners() {
+      if (!modal || !form || !categorySelect || !commentTextarea) return;
+
+      // Close modal events
+      closeButton?.addEventListener("click", closeModal);
+      modal?.addEventListener("click", handleBackdropClick);
+
+      // Escape key to close
+      document.addEventListener("keydown", handleKeydown);
+
+      // Category change to show/hide suggested tag
+      categorySelect.addEventListener("change", handleCategoryChange);
+
+      // Character counter
+      commentTextarea.addEventListener("input", updateCharacterCounter);
+
+      // Form submission
+      form.addEventListener("submit", handleSubmit);
+
+      // Retry button
+      const retryButton = modal.querySelector(
+        '[data-testid="retry-button"]',
+      ) as HTMLButtonElement;
+      retryButton?.addEventListener("click", handleRetry);
+    }
+
+    function handleBackdropClick(event: MouseEvent) {
+      // Only close if clicking the modal backdrop (not the content)
+      if (event.target === modal) {
+        closeModal();
+      }
+    }
+
+    function handleKeydown(event: KeyboardEvent) {
+      if (!modal || !isModalOpen()) return;
+
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closeModal();
+      }
+
+      // Focus trap
+      if (event.key === "Tab") {
+        trapFocus(event);
+      }
+    }
+
+    function handleCategoryChange(event: Event) {
+      const target = event.target as HTMLSelectElement;
+      if (!suggestedTagField) return;
+
+      if (target.value === "Other") {
+        suggestedTagField.style.display = "flex";
+        suggestedTagField.classList.add("feedback-modal__field--visible");
+        suggestedTagInput?.focus();
+      } else {
+        suggestedTagField.style.display = "none";
+        suggestedTagField.classList.remove("feedback-modal__field--visible");
+        if (suggestedTagInput) {
+          suggestedTagInput.value = "";
+        }
+      }
+    }
+
+    function updateCharacterCounter() {
+      if (!commentTextarea || !characterCounter) return;
+
+      const current = commentTextarea.value.length;
+      const max = parseInt(commentTextarea.getAttribute("maxlength") || "1000");
+      const currentSpan = characterCounter.querySelector(
+        ".feedback-modal__counter-current",
+      );
+
+      if (currentSpan) {
+        currentSpan.textContent = current.toString();
+      }
+
+      // Update counter styling based on usage
+      characterCounter.className = "feedback-modal__counter";
+      if (current > max * 0.9) {
+        characterCounter.classList.add("feedback-modal__counter--danger");
+      } else if (current > max * 0.75) {
+        characterCounter.classList.add("feedback-modal__counter--warning");
+      }
+    }
+
+    function setupFocusTrap() {
+      // Will be used by trapFocus function
+    }
+
+    function trapFocus(event: KeyboardEvent) {
+      if (!modal) return;
+
+      const focusableElements = modal.querySelectorAll(
+        'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      );
+
+      // Filter out hidden elements and cast to HTMLElement
+      const visibleFocusableElements = Array.from(focusableElements)
+        .filter((el) => {
+          const htmlEl = el as HTMLElement;
+          return (
+            htmlEl.offsetParent !== null &&
+            getComputedStyle(htmlEl).visibility !== "hidden" &&
+            getComputedStyle(htmlEl).display !== "none"
+          );
+        })
+        .map((el) => el as HTMLElement);
+
+      if (visibleFocusableElements.length === 0) return;
+
+      const firstElement = visibleFocusableElements[0];
+      const lastElement =
+        visibleFocusableElements[visibleFocusableElements.length - 1];
+
+      if (event.shiftKey) {
+        // Shift + Tab
+        if (document.activeElement === firstElement) {
+          event.preventDefault();
+          lastElement.focus();
+        }
+      } else {
+        // Tab
+        if (document.activeElement === lastElement) {
+          event.preventDefault();
+          firstElement.focus();
+        }
+      }
+    }
+
+    function openModal() {
+      if (!modal) return;
+
+      // Store current focus
+      previouslyFocusedElement = document.activeElement as HTMLElement;
+
+      // Lock body scroll
+      originalBodyOverflow = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+
+      // Show modal
+      modal.style.display = "flex";
+      modal.classList.add("feedback-modal--open");
+
+      // Focus first field
+      categorySelect?.focus();
+
+      // Reset form state
+      setFormState("idle");
+    }
+
+    function closeModal() {
+      if (!modal) return;
+
+      // Hide modal
+      modal.style.display = "none";
+      modal.classList.remove("feedback-modal--open");
+
+      // Restore body scroll
+      document.body.style.overflow = originalBodyOverflow;
+
+      // Restore focus with a slight delay to ensure modal is fully closed
+      setTimeout(() => {
+        if (previouslyFocusedElement) {
+          previouslyFocusedElement.focus();
+        }
+      }, 10);
+
+      // Reset form if not in success state
+      if (currentState !== "success") {
+        resetForm();
+      }
+    }
+
+    function isModalOpen(): boolean {
+      return modal?.classList.contains("feedback-modal--open") || false;
+    }
+
+    function setFormState(state: FormState) {
+      if (!form) return;
+
+      currentState = state;
+      form.setAttribute("data-state", state);
+
+      // Enable/disable submit button
+      if (submitButton) {
+        submitButton.disabled = state === "loading";
+      }
+
+      // Auto-close on success after delay
+      if (state === "success") {
+        setTimeout(() => {
+          closeModal();
+          resetForm();
+        }, 3000);
+      }
+    }
+
+    function resetForm() {
+      if (!form) return;
+
+      form.reset();
+      setFormState("idle");
+      updateCharacterCounter();
+
+      // Hide suggested tag field
+      if (suggestedTagField) {
+        suggestedTagField.style.display = "none";
+        suggestedTagField.classList.remove("feedback-modal__field--visible");
+      }
+
+      // Clear validation errors
+      const errorElements = form.querySelectorAll(".feedback-modal__error");
+      errorElements.forEach((error) => {
+        error.textContent = "";
+      });
+    }
+
+    async function handleSubmit(event: Event) {
+      event.preventDefault();
+      if (!form || currentState === "loading") return;
+
+      setFormState("loading");
+
+      try {
+        // Collect form data
+        const formData = new FormData(form);
+        const data = {
+          page: window.location.pathname,
+          category: formData.get("category"),
+          comment: formData.get("comment"),
+          suggestedTag: formData.get("suggestedTag") || null,
+          timestamp: new Date().toISOString(),
+          userAgent: navigator.userAgent,
+        };
+
+        // Submit to API
+        const response = await fetch("/api/feedback", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(data),
+        });
+
+        if (response.ok) {
+          setFormState("success");
+        } else {
+          throw new Error("Submission failed");
+        }
+      } catch (error) {
+        console.error("Feedback submission error:", error);
+        setFormState("error");
+      }
+    }
+
+    function handleRetry() {
+      setFormState("idle");
+    }
+
+    // Initialize when DOM is ready
+    function initialize() {
+      initializeModal();
+    }
+
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", initialize);
+    } else {
+      initialize();
+    }
+
+    // Expose API for cleanup
+    window.starmarkFeedbackModal = {
+      open: openModal,
+      close: closeModal,
+      isOpen: isModalOpen,
+      cleanup: function () {
+        document.removeEventListener("keydown", handleKeydown);
+        // Additional cleanup as needed
+      },
+    };
+
+    console.log("StarMark: Feedback modal initialized");
+  })();
+</script>
