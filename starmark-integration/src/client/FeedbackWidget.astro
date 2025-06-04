@@ -1,0 +1,169 @@
+---
+export interface Props {
+  /**
+   * Categories available in the feedback form
+   */
+  categories?: string[];
+
+  /**
+   * Position of the widget on the page
+   */
+  position?: "bottom-right" | "bottom-left" | "top-right" | "top-left";
+
+  /**
+   * Text to display in the widget
+   */
+  text?: string;
+}
+
+const {
+  categories = ["Bug", "Feature Request", "Question", "Typo"],
+  position = "bottom-right",
+  text = "Feedback",
+} = Astro.props;
+
+// Store categories for use in future modal implementation
+const widgetCategories = categories;
+---
+
+<button
+  class={`feedback-widget feedback-widget--${position}`}
+  data-testid="feedback-widget"
+  data-categories={JSON.stringify(widgetCategories)}
+  id="starmark-feedback-widget"
+  aria-label="Open feedback form"
+  type="button"
+>
+  <span class="feedback-widget__text">{text}</span>
+  <span class="feedback-widget__icon" aria-hidden="true">💬</span>
+</button>
+
+<style>
+  .feedback-widget {
+    position: fixed;
+    background: var(--sl-color-accent);
+    color: var(--sl-color-white);
+    border: none;
+    border-radius: 8px;
+    padding: 12px 16px;
+    cursor: pointer;
+    font-family: var(--sl-font);
+    font-size: var(--sl-text-sm);
+    font-weight: 600;
+    z-index: 99999;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    pointer-events: auto;
+  }
+
+  .feedback-widget:hover {
+    background: var(--sl-color-accent-high);
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+  }
+
+  .feedback-widget:focus {
+    outline: 2px solid var(--sl-color-accent);
+    outline-offset: 2px;
+  }
+
+  .feedback-widget--bottom-right {
+    bottom: 24px;
+    right: 24px;
+  }
+
+  .feedback-widget--bottom-left {
+    bottom: 24px;
+    left: 24px;
+  }
+
+  .feedback-widget--top-right {
+    top: 24px;
+    right: 24px;
+  }
+
+  .feedback-widget--top-left {
+    top: 24px;
+    left: 24px;
+  }
+
+  .feedback-widget__text {
+    display: block;
+  }
+
+  .feedback-widget__icon {
+    display: block;
+    font-size: 1.2em;
+  }
+
+  /* Responsive behavior */
+  @container (max-width: 480px) {
+    .feedback-widget {
+      padding: 10px 12px;
+      font-size: var(--sl-text-xs);
+    }
+
+    .feedback-widget__text {
+      display: none;
+    }
+  }
+
+  /* Reduced motion support */
+  @media (prefers-reduced-motion: reduce) {
+    .feedback-widget {
+      transition: none;
+    }
+
+    .feedback-widget:hover {
+      transform: none;
+    }
+  }
+
+  /* Print styles */
+  @media print {
+    .feedback-widget {
+      display: none;
+    }
+  }
+
+  /* Dark mode support using Starlight variables */
+  :global([data-theme="dark"]) .feedback-widget {
+    background: var(--sl-color-accent);
+    color: var(--sl-color-white);
+  }
+</style>
+
+<script>
+  // Client-side interactivity
+  function initializeFeedbackWidget() {
+    const widget = document.getElementById("starmark-feedback-widget");
+
+    if (widget) {
+      // Add a data attribute to indicate the script has run
+      widget.setAttribute("data-script-loaded", "true");
+
+      widget.addEventListener("click", () => {
+        console.log("Feedback widget clicked - modal will be implemented next");
+        // TODO: Open feedback modal
+      });
+
+      // Keyboard navigation support
+      widget.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          widget.click();
+        }
+      });
+    }
+  }
+
+  // Initialize when DOM is ready
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initializeFeedbackWidget);
+  } else {
+    initializeFeedbackWidget();
+  }
+</script>

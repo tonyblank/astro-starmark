@@ -26,6 +26,9 @@ export default defineConfig({
           ],
         },
       ],
+      components: {
+        Footer: './src/components/Footer.astro',
+      },
     }),
     starmark({
       linear: {

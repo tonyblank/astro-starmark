@@ -30,22 +30,7 @@ export default [
       '@typescript-eslint/no-explicit-any': 'warn',
     },
   },
-  {
-    files: ['**/*.astro'],
-    plugins: {
-      astro,
-    },
-    languageOptions: {
-      parser: astro.parser,
-      parserOptions: {
-        parser: tsparser,
-        extraFileExtensions: ['.astro'],
-      },
-    },
-    rules: {
-      ...astro.configs.recommended.rules,
-    },
-  },
+  ...astro.configs.recommended,
   {
     ignores: ['dist/', 'node_modules/', '.turbo/'],
   },

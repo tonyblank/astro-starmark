@@ -32,22 +32,7 @@ export default [
       '@typescript-eslint/triple-slash-reference': 'off',
     },
   },
-  {
-    files: ['**/*.astro'],
-    plugins: {
-      astro,
-    },
-    languageOptions: {
-      parser: astro.parser,
-      parserOptions: {
-        parser: tsparser,
-        extraFileExtensions: ['.astro'],
-      },
-    },
-    rules: {
-      ...astro.configs.recommended.rules,
-    },
-  },
+  ...astro.configs.recommended,
   {
     ignores: ['dist/', 'node_modules/', '.turbo/', '.astro/', 'playwright-report/', 'test-results/'],
   },
