@@ -382,16 +382,25 @@ The frontend-to-backend submission pipeline is now fully functional and producti
 
 ---
 
-## Milestone 5: Backend Connectors Implementation
+## Milestone 5: Storage Connectors (Astro Pattern-First)
 
-### Connector Interface & Health Checks
-- [ ] **TEST**: Connector interface works with health monitoring
+### Storage Connector Interface & Registry System
+- [ ] **TEST**: Pluggable storage connector interface with auto-discovery
   ```typescript
-  test('FeedbackStorage interface with health checks', async () => {
-    const mockConnector: FeedbackStorage = {
+  test('StorageConnector interface with auto-discovery registry', async () => {
+    const mockConnector: StorageConnector = {
+      name: 'test-storage',
       store: vi.fn().mockResolvedValue({ success: true, id: 'test-123' }),
-      health: vi.fn().mockResolvedValue(true)
+      health: vi.fn().mockResolvedValue(true),
+      getAnalytics: vi.fn().mockResolvedValue({ totalFeedback: 42, categories: { Typo: 10 } }),
+      detect: vi.fn().mockReturnValue(true)
     };
+    
+    const registry = new StorageRegistry();
+    registry.register(mockConnector);
+    
+    const availableConnectors = registry.detectAvailable();
+    expect(availableConnectors).toContain(mockConnector);
     
     const feedback: FeedbackData = { /* valid feedback */ };
     const result = await mockConnector.store(feedback);
@@ -401,15 +410,16 @@ The frontend-to-backend submission pipeline is now fully functional and producti
     expect(await mockConnector.health()).toBe(true);
   });
   ```
-- [ ] Define `FeedbackStorage` interface with health checks
-- [ ] Create base connector types with proper error handling
-- [ ] Add connector health monitoring
-- [ ] Make interface test pass
+- [ ] Define `StorageConnector` interface with detection capabilities
+- [ ] Create `StorageRegistry` for auto-discovery of available connectors
+- [ ] Add base connector types with error handling and retry logic
+- [ ] Add health monitoring with circuit breaker pattern
+- [ ] Make storage interface test pass
 
-### Linear Connector with GraphQL
-- [ ] **TEST**: Linear connector creates issues with proper error handling
+### Linear Connector (Point of Truth for Issues)
+- [ ] **TEST**: Linear connector serves as primary issue tracker for feedback
   ```typescript
-  test('LinearConnector handles success and error cases', async () => {
+  test('LinearConnector creates actionable issues with rich context', async () => {
     // Mock successful Linear API response
     server.use(
       http.post('https://api.linear.app/graphql', () => {
@@ -417,7 +427,11 @@ The frontend-to-backend submission pipeline is now fully functional and producti
           data: {
             issueCreate: {
               success: true,
-              issue: { id: 'test-123', title: 'Test Issue' }
+              issue: { 
+                id: 'test-123', 
+                title: '[Feedback] Typo in /docs/test',
+                url: 'https://linear.app/team/issue/test-123'
+              }
             }
           }
         });
@@ -432,164 +446,458 @@ The frontend-to-backend submission pipeline is now fully functional and producti
     const feedback: FeedbackData = { 
       page: '/docs/test',
       category: 'Typo',
-      comment: 'Test feedback'
+      comment: 'Test feedback',
+      highlighted_text: 'selected text',
+      user: { email: 'user@example.com' }
     };
     
     const result = await connector.store(feedback);
     
     expect(result.success).toBe(true);
     expect(result.id).toBe('test-123');
+    expect(result.metadata).toHaveProperty('issueUrl');
   });
   ```
-- [ ] Implement `LinearConnector` class with GraphQL mutations
-- [ ] Add proper error handling and retry logic
-- [ ] Add rate limiting protection
-- [ ] Add health check implementation
+- [ ] Implement `LinearConnector` as primary external issue tracker
+- [ ] Add rich issue formatting with feedback context (page, highlights, user info)
+- [ ] Add GraphQL mutations with proper field mapping (title, description, labels)
+- [ ] Add rate limiting protection and retry logic with exponential backoff
+- [ ] Add team/project configuration and auto-labeling by category
 - [ ] Make Linear connector test pass
 
-### Astro DB Connector with Drizzle
-- [ ] **TEST**: Astro DB connector with schema and migrations
+### Astro DB Connector (Primary SQL Storage Following Astro Patterns)
+- [ ] **TEST**: Astro DB connector adapts to deployment environment automatically
   ```typescript
-  test('AstroDbConnector stores feedback with proper schema', async () => {
-    // Use real SQLite in-memory database
-    const sqlite = new Database(':memory:');
-    const db = drizzle(sqlite);
-    
-    // Run migrations
-    await migrate(db, { migrationsFolder: './drizzle' });
-    
-    const connector = new AstroDbConnector(db);
+  test('AstroDbConnector works across all deployment targets', async () => {
+    // Test local development (SQLite)
+    const devConnector = new AstroDbConnector({ mode: 'development' });
     const feedback: FeedbackData = { 
       page: '/docs/test',
       category: 'Typo',
-      comment: 'Test feedback'
+      comment: 'Test feedback',
+      timestamp: new Date().toISOString(),
+      highlighted_text: 'selected text',
+      section_context: 'Introduction',
+      user_info: { email: 'user@test.com' }
     };
     
-    const result = await connector.store(feedback);
+    const devResult = await devConnector.store(feedback);
+    expect(devResult.success).toBe(true);
+    expect(devResult.id).toBeDefined();
     
-    expect(result.success).toBe(true);
-    expect(result.id).toBeDefined();
+    // Test production (libSQL - Turso/D1)
+    const prodConnector = new AstroDbConnector({ 
+      mode: 'production',
+      remoteUrl: 'libsql://test.turso.io',
+      authToken: 'test-token'
+    });
     
-    // Verify data was stored
-    const stored = await db.select().from(feedbackTable);
-    expect(stored).toHaveLength(1);
-    expect(stored[0].comment).toBe('Test feedback');
+    const prodResult = await prodConnector.store(feedback);
+    expect(prodResult.success).toBe(true);
+    
+    // Test analytics aggregation
+    const analytics = await devConnector.getAnalytics();
+    expect(analytics.totalFeedback).toBeGreaterThanOrEqual(1);
+    expect(analytics.categories).toHaveProperty('Typo');
+    expect(analytics.pageStats).toContainEqual({
+      page: '/docs/test',
+      count: expect.any(Number)
+    });
   });
   ```
-- [ ] Define Feedback table schema with Drizzle
-- [ ] Implement `AstroDbConnector` class
-- [ ] Add database integration to docs-site
-- [ ] Create and run migrations
+- [ ] Define Feedback table schema using Astro DB `defineTable` with comprehensive fields
+- [ ] Implement `AstroDbConnector` that automatically detects deployment environment
+- [ ] Add proper libSQL configuration for Cloudflare D1 deployment compatibility  
+- [ ] Fix Cloudflare environment variable access (use `context.env` instead of `process.env`)
+- [ ] Add analytics queries with Drizzle ORM for reporting dashboard
+- [ ] Add automatic schema migrations using Astro DB patterns
 - [ ] Make Astro DB connector test pass
 
-### Endpoint Integration with Multiple Connectors
-- [ ] **TEST**: Endpoint orchestrates multiple connectors correctly
+### Cloudflare Environment Variable Fix
+- [ ] **TEST**: Environment variables work correctly in Cloudflare Workers/Pages
   ```typescript
-  test('feedback endpoint handles multiple connector results', async () => {
+  test('Environment variables accessible in Cloudflare deployment', async () => {
+    // Mock Cloudflare environment context
+    const mockContext = {
+      env: {
+        ASTRO_DB_REMOTE_URL: 'libsql://test.turso.io',
+        ASTRO_DB_APP_TOKEN: 'test-token',
+        LINEAR_API_KEY: 'test-linear-key'
+      }
+    };
+    
+    const envAdapter = new CloudflareEnvAdapter();
+    const envVars = envAdapter.getEnvironmentVariables(mockContext);
+    
+    expect(envVars.ASTRO_DB_REMOTE_URL).toBe('libsql://test.turso.io');
+    expect(envVars.LINEAR_API_KEY).toBe('test-linear-key');
+    
+    // Should fall back to process.env in non-Cloudflare environments
+    const localEnvVars = envAdapter.getEnvironmentVariables(null);
+    expect(localEnvVars).toBe(process.env);
+  });
+  ```
+- [ ] Create `CloudflareEnvAdapter` to handle environment variable access differences
+- [ ] Update all connectors to use adapter instead of direct `process.env` access
+- [ ] Add runtime detection of Cloudflare Workers/Pages environment
+- [ ] Add comprehensive environment variable validation and error messages
+- [ ] Make environment variable fix test pass
+
+### Additional Pluggable Connectors
+- [ ] **TEST**: Easy addition of new storage connectors following interface pattern
+  ```typescript
+  test('NotionConnector follows StorageConnector interface', async () => {
+    const notionConnector = new NotionConnector({
+      apiKey: 'test-notion-key',
+      databaseId: 'test-db-id'
+    });
+    
+    // Should implement StorageConnector interface
+    expect(notionConnector.name).toBe('notion');
+    expect(notionConnector.detect).toBeDefined();
+    expect(notionConnector.store).toBeDefined();
+    expect(notionConnector.health).toBeDefined();
+    
+    const feedback: FeedbackData = { 
+      page: '/docs/test',
+      category: 'Suggestion',
+      comment: 'Add more examples'
+    };
+    
+    const result = await notionConnector.store(feedback);
+    expect(result.success).toBe(true);
+  });
+  ```
+- [ ] Implement `NotionConnector` for sites wanting Notion database integration
+- [ ] Implement `GitHubIssuesConnector` for open-source projects
+- [ ] Add `SlackConnector` for team notification workflows  
+- [ ] Add connector template and documentation for custom connectors
+- [ ] Make additional connectors test pass
+
+### Endpoint Integration with Registry & Error Resilience
+- [ ] **TEST**: Endpoint uses registry to auto-discover and orchestrate connectors
+  ```typescript
+  test('feedback endpoint uses StorageRegistry for auto-discovery and error handling', async () => {
     const mockLinear = { 
+      name: 'linear',
       store: vi.fn().mockResolvedValue({ success: true, id: 'linear-123' }),
-      health: vi.fn().mockResolvedValue(true)
+      health: vi.fn().mockResolvedValue(true),
+      detect: vi.fn().mockReturnValue(true)
     };
-    const mockDb = { 
-      store: vi.fn().mockResolvedValue({ success: true, id: 'db-456' }),
-      health: vi.fn().mockResolvedValue(true)
+    const mockAstroDB = { 
+      name: 'astrodb',
+      store: vi.fn().mockRejectedValue(new Error('DB connection failed')),
+      health: vi.fn().mockResolvedValue(false),
+      detect: vi.fn().mockReturnValue(true)
     };
+    
+    const registry = new StorageRegistry();
+    registry.register(mockLinear);
+    registry.register(mockAstroDB);
     
     const response = await handleFeedbackSubmission(
       new Request('http://localhost/api/feedback', {
         method: 'POST',
         body: JSON.stringify(testFeedback)
       }),
-      { connectors: [mockLinear, mockDb] }
+      { 
+        storageRegistry: registry,
+        connectorConfig: { linear: { priority: 'high' }, astrodb: { priority: 'medium' } }
+      }
     );
     
-    expect(response.status).toBe(200);
+    expect(response.status).toBe(200); // Should succeed if Linear (high priority) works
     expect(mockLinear.store).toHaveBeenCalled();
-    expect(mockDb.store).toHaveBeenCalled();
+    expect(mockAstroDB.store).toHaveBeenCalled();
     
     const result = await response.json();
     expect(result.success).toBe(true);
     expect(result.results).toHaveLength(2);
+    expect(result.results.find(r => r.connector === 'linear').success).toBe(true);
+    expect(result.results.find(r => r.connector === 'astrodb').success).toBe(false);
   });
   ```
-- [ ] Implement connector orchestration in endpoint
-- [ ] Add proper error handling (continue if one fails)
-- [ ] Add structured logging with correlation IDs
-- [ ] Add performance monitoring
+- [ ] Integrate `StorageRegistry` into feedback endpoint for auto-discovery
+- [ ] Add connector priority system (Linear as high priority "point of truth")
+- [ ] Add parallel execution with proper error isolation between connectors
+- [ ] Add structured logging with correlation IDs and performance metrics
+- [ ] Add retry logic with exponential backoff for transient failures
+- [ ] Add circuit breaker pattern for connector health management
 - [ ] Make endpoint integration test pass
+
+### Analytics & Reporting Infrastructure
+- [ ] **TEST**: Analytics aggregation works across connectors
+  ```typescript
+  test('analytics system aggregates data from multiple sources', async () => {
+    const analyticsService = new AnalyticsService([astroDbConnector, linearConnector]);
+    
+    const monthlyReport = await analyticsService.getMonthlyReport();
+    expect(monthlyReport).toHaveProperty('totalFeedback');
+    expect(monthlyReport).toHaveProperty('categoryCounts');
+    expect(monthlyReport).toHaveProperty('topPages');
+    expect(monthlyReport).toHaveProperty('sentimentAnalysis');
+    
+    const pageReport = await analyticsService.getPageReport('/docs/getting-started');
+    expect(pageReport.pageUrl).toBe('/docs/getting-started');
+    expect(pageReport.feedbackCount).toBeGreaterThanOrEqual(0);
+  });
+  ```
+- [ ] Implement `AnalyticsService` class for cross-connector reporting
+- [ ] Add analytics query interfaces for time-based reports
+- [ ] Add page-specific analytics and feedback trends
+- [ ] Add basic sentiment analysis for feedback comments
+- [ ] Make analytics test pass
+
+### Example Sites Strategy & Testing Matrix
+- [ ] **TEST**: starmark.dev production site works as comprehensive example
+  ```typescript
+  test('starmark.dev demonstrates full plugin capabilities in production', async ({ page }) => {
+    await page.goto('https://starmark.dev/docs/getting-started');
+    
+    // Should have feedback widget
+    const widget = page.getByTestId('feedback-widget');
+    await expect(widget).toBeVisible();
+    
+    // Should support Auth0 login
+    const loginButton = page.getByRole('button', { name: /log in/i });
+    await expect(loginButton).toBeVisible();
+    
+    // Should handle feedback submission with full stack (Auth0 + AstroDB-on-D1 + Linear)
+    await widget.click();
+    
+    const modal = page.getByTestId('feedback-modal');
+    await expect(modal).toBeVisible();
+    
+    await page.getByTestId('category-select').selectOption('Bug Report');
+    await page.getByTestId('comment-textarea').fill('Test feedback from E2E');
+    await page.getByTestId('submit-button').click();
+    
+    // Should show success message
+    await expect(page.getByText('Thank you for your feedback!')).toBeVisible();
+  });
+  ```
+- [ ] Configure starmark.dev as production marketing + documentation site
+- [ ] Deploy starmark.dev to Cloudflare Pages with Auth0 + AstroDB-on-D1 + Linear
+- [ ] Use starmark.dev as primary example (no duplicate work)
+- [ ] Create comprehensive E2E testing suite against production site
+- [ ] Make starmark.dev production example test pass
+
+### Local Development Example Sites
+- [ ] **TEST**: Each example site tests different auth + storage combinations
+  ```typescript
+  const testMatrix = [
+    { 
+      site: 'docs-clerk', 
+      auth: 'clerk', 
+      storage: 'astrodb-sqlite', 
+      external: 'linear',
+      deployment: 'local-only'
+    },
+    { 
+      site: 'docs-firebase', 
+      auth: 'firebase', 
+      storage: 'astrodb-turso', 
+      external: 'notion',
+      deployment: 'local-only'
+    },
+    { 
+      site: 'docs-multi-auth', 
+      auth: ['auth0', 'clerk'], 
+      storage: 'astrodb-sqlite', 
+      external: 'github-issues',
+      deployment: 'local-only'
+    }
+  ];
+  
+  testMatrix.forEach(({ site, auth, storage, external }) => {
+    test(`${site} example works with ${auth} + ${storage} + ${external}`, async () => {
+      // Test each combination works locally
+      expect(true).toBe(true); // Placeholder for implementation
+    });
+  });
+  ```
+- [ ] Create `docs-clerk` example (Clerk + AstroDB-on-SQLite + Linear)
+- [ ] Create `docs-firebase` example (Firebase + AstroDB-on-Turso + Notion)
+- [ ] Create `docs-multi-auth` example (Multiple auth providers + GitHub Issues)
+- [ ] Add comprehensive local testing for each combination
+- [ ] Add documentation for each example setup
+- [ ] Make local example sites test pass
 
 ---
 
-## Milestone 6: Auth0 Integration
+## Milestone 6: Authentication Detection & Integration System
 
-### Auth Interface & JWT Validation
-- [ ] **TEST**: Auth provider interface validates tokens correctly
+### Auth Detection Interface (Plugin Adapts to Site's Auth)
+- [ ] **TEST**: Plugin detects and integrates with site's existing auth providers
   ```typescript
-  test('AuthProvider interface validates JWT tokens', async () => {
-    const mockAuth: AuthProvider = {
-      getCurrentUser: vi.fn().mockResolvedValue({
-        id: 'user-123',
-        email: 'test@example.com',
-        name: 'Test User'
-      }),
-      validateToken: vi.fn().mockResolvedValue(true)
-    };
-    
-    const request = new Request('http://localhost', {
-      headers: { Authorization: 'Bearer test-token' }
-    });
-    
-    const user = await mockAuth.getCurrentUser(request);
-    expect(user).toHaveProperty('email', 'test@example.com');
-    
-    const isValid = await mockAuth.validateToken('test-token');
-    expect(isValid).toBe(true);
-  });
-  ```
-- [ ] Define `AuthProvider` interface with JWT validation
-- [ ] Create base auth types and utilities
-- [ ] Add JWT token validation utilities
-- [ ] Make auth interface test pass
-
-### Auth0 Implementation with SPA SDK
-- [ ] **TEST**: Auth0 provider integrates with SPA SDK correctly
-  ```typescript
-  test('Auth0Provider works with SPA SDK', async () => {
-    // Mock Auth0 API responses
-    server.use(
-      http.get('https://dev-example.auth0.com/userinfo', () => {
-        return HttpResponse.json({
+  test('Plugin detects existing auth providers on the site', async () => {
+    // Mock different auth providers being present on the site
+    global.window = {
+      // Auth0 SPA SDK detected
+      auth0Client: {
+        getUser: vi.fn().mockResolvedValue({
           sub: 'auth0|123',
           email: 'test@example.com',
           name: 'Test User'
-        });
+        }),
+        getIdTokenClaims: vi.fn().mockResolvedValue({ __raw: 'jwt-token' })
+      },
+      // Clerk detected
+      Clerk: {
+        user: {
+          id: 'user_123',
+          emailAddresses: [{ emailAddress: 'test@example.com' }],
+          fullName: 'Test User'
+        }
+      }
+    } as any;
+    
+    const authDetector = new AuthDetector();
+    const detectedProviders = await authDetector.detectProviders();
+    
+    expect(detectedProviders).toContain('auth0');
+    expect(detectedProviders).toContain('clerk');
+    
+    const currentUser = await authDetector.getCurrentUser();
+    expect(currentUser).toHaveProperty('email', 'test@example.com');
+  });
+  ```
+- [ ] Create `AuthDetector` class that discovers auth providers already on the site
+- [ ] Add detection logic for Auth0 SPA SDK (`window.auth0Client`)
+- [ ] Add detection logic for Clerk (`window.Clerk`)
+- [ ] Add detection logic for Firebase Auth (`firebase.auth()`)
+- [ ] Add fallback for custom auth via callback functions
+- [ ] Make auth detection test pass
+
+### StarMark.dev Site Auth0 Integration (Site Implementation)
+- [ ] **TEST**: starmark.dev site has working Auth0 authentication
+  ```typescript
+  test('starmark.dev site implements Auth0 for user authentication', async ({ page }) => {
+    await page.goto('/');
+    
+    // Should show login/logout based on auth state
+    const loginButton = page.getByRole('button', { name: /log in|sign in/i });
+    const logoutButton = page.getByRole('button', { name: /log out|sign out/i });
+    
+    // Initially should show login
+    await expect(loginButton.or(logoutButton)).toBeVisible();
+    
+    // Mock login state for testing feedback integration
+    await page.evaluate(() => {
+      window.auth0Client = {
+        getUser: () => Promise.resolve({
+          sub: 'auth0|123',
+          email: 'test@starmark.dev',
+          name: 'Test User'
+        }),
+        getIdTokenClaims: () => Promise.resolve({ __raw: 'mock-jwt-token' })
+      };
+    });
+    
+    // Open feedback widget - should detect user
+    await page.getByTestId('feedback-widget').click();
+    const modal = page.getByTestId('feedback-modal');
+    await expect(modal).toContainText('test@starmark.dev');
+  });
+  ```
+- [ ] Configure Auth0 application in starmark.dev for user login/logout
+- [ ] Add Auth0 SPA SDK to starmark.dev site for client-side auth state
+- [ ] Add login/logout UI components to starmark.dev site
+- [ ] Add session management with Cloudflare KV storage
+- [ ] Set up Auth0 callbacks and redirect URLs for starmark.dev domain
+- [ ] Make starmark.dev Auth0 integration test pass
+
+### Plugin Server-Side Token Validation
+- [ ] **TEST**: Plugin validates Auth0 tokens server-side
+  ```typescript
+  test('Plugin validates Auth0 tokens from starmark.dev users', async () => {
+    // Mock Auth0 userinfo endpoint for token validation
+    server.use(
+      http.get('https://dev-example.auth0.com/userinfo', ({ request }) => {
+        const authHeader = request.headers.get('Authorization');
+        if (authHeader === 'Bearer valid-token') {
+          return HttpResponse.json({
+            sub: 'auth0|123',
+            email: 'test@starmark.dev',
+            name: 'Test User',
+            email_verified: true
+          });
+        }
+        return HttpResponse.json({ error: 'Invalid token' }, { status: 401 });
       })
     );
     
-    const auth0 = new Auth0Provider({
+    const tokenValidator = new Auth0TokenValidator({
       domain: 'dev-example.auth0.com',
-      clientId: 'test-client-id',
-      audience: 'https://api.example.com'
+      audience: 'https://api.starmark.dev'
     });
     
-    const request = new Request('http://localhost', {
-      headers: { Authorization: 'Bearer valid-token' }
-    });
+    const userInfo = await tokenValidator.validateAndGetUser('valid-token');
+    expect(userInfo).toHaveProperty('email', 'test@starmark.dev');
     
-    const user = await auth0.getCurrentUser(request);
-    expect(user).toHaveProperty('email', 'test@example.com');
+    const invalidResult = await tokenValidator.validateAndGetUser('invalid-token');
+    expect(invalidResult).toBeNull();
   });
   ```
-- [ ] Implement `Auth0Provider` class with SPA SDK
-- [ ] Add JWT token validation with Auth0 libraries
-- [ ] Add Auth0 API integration for user info
-- [ ] Configure Auth0 in docs-site for testing
-- [ ] Make Auth0 provider test pass
+- [ ] Implement `Auth0TokenValidator` class for server-side JWT validation
+- [ ] Add Auth0 Management API integration for user profile retrieval
+- [ ] Add proper scopes and audience validation for security
+- [ ] Add token expiry and refresh handling
+- [ ] Use environment variables for Auth0 domain/client secret (plugin config)
+- [ ] Make Auth0 token validation test pass
 
-### Anonymous Fallback & Session Management
-- [ ] **TEST**: System handles anonymous and authenticated users
+### Alternative Auth Provider Detection (Plugin Side)
+- [ ] **TEST**: Plugin detects and integrates with Clerk and Firebase when present on sites
   ```typescript
-  test('feedback works for both anonymous and authenticated users', async () => {
+  test('Plugin detects Clerk and Firebase when sites use them', async () => {
+    // Mock site with Clerk integration
+    global.window.Clerk = {
+      user: {
+        id: 'user_123',
+        emailAddresses: [{ emailAddress: 'test@example.com' }],
+        fullName: 'Test User'
+      },
+      session: {
+        getToken: () => Promise.resolve('clerk-session-token')
+      }
+    };
+    
+    // Mock site with Firebase integration
+    global.window.firebase = {
+      auth: () => ({
+        currentUser: {
+          uid: 'firebase-user-123',
+          email: 'test@example.com',
+          displayName: 'Test User'
+        }
+      })
+    };
+    
+    const authDetector = new AuthDetector();
+    const providers = await authDetector.detectProviders();
+    
+    expect(providers).toContain('clerk');
+    expect(providers).toContain('firebase');
+    
+    // Should be able to get user from either provider
+    const clerkUser = await authDetector.getCurrentUser('clerk');
+    expect(clerkUser).toHaveProperty('email', 'test@example.com');
+    
+    const firebaseUser = await authDetector.getCurrentUser('firebase');
+    expect(firebaseUser).toHaveProperty('email', 'test@example.com');
+  });
+  ```
+- [ ] Add Clerk detection logic (check for `window.Clerk` object and user state)
+- [ ] Add Firebase Auth detection logic (check for `firebase.auth().currentUser`)
+- [ ] Add server-side token validation for Clerk session tokens 
+- [ ] Add server-side token validation for Firebase ID tokens
+- [ ] Add documentation for how sites should implement each auth provider
+- [ ] Make alternative provider detection test pass
+
+### Anonymous Fallback & Privacy Controls
+- [ ] **TEST**: System handles anonymous and authenticated users with privacy controls
+  ```typescript
+  test('feedback works for both anonymous and authenticated users with privacy options', async () => {
     // Test anonymous submission
     const anonResponse = await handleFeedbackSubmission(
       new Request('http://localhost/api/feedback', {
@@ -601,22 +909,702 @@ The frontend-to-backend submission pipeline is now fully functional and producti
     
     expect(anonResponse.status).toBe(200);
     
-    // Test authenticated submission
+    // Test authenticated submission with privacy control
     const authResponse = await handleFeedbackSubmission(
       new Request('http://localhost/api/feedback', {
         method: 'POST',
         headers: { Authorization: 'Bearer valid-token' },
-        body: JSON.stringify(testFeedback)
+        body: JSON.stringify({
+          ...testFeedback,
+          includeUserInfo: false // User chose to submit anonymously
+        })
       })
     );
     
     expect(authResponse.status).toBe(200);
   });
   ```
-- [ ] Ensure anonymous submissions work seamlessly
-- [ ] Add session management for authenticated users
-- [ ] Add proper logging for anonymous vs authenticated
-- [ ] Add user info attachment to feedback data
+- [ ] Ensure anonymous submissions work seamlessly by default
+- [ ] Add session management for authenticated users with proper security
+- [ ] Add privacy controls (users can choose to submit anonymously even when logged in)
+- [ ] Add proper logging for anonymous vs authenticated with GDPR compliance
+- [ ] Add user info attachment to feedback data with consent tracking
 - [ ] Make anonymous fallback test pass
+
+---
+
+## Milestone 7: Text Highlighting & Annotation System
+
+### Selection API Integration
+- [ ] **TEST**: Text selection triggers annotation UI
+  ```typescript
+  test('text selection shows annotation prompt', async ({ page }) => {
+    await page.goto('/docs/getting-started');
+    
+    // Select text in a paragraph
+    const paragraph = page.locator('p').first();
+    await paragraph.selectText();
+    
+    // Should show annotation tooltip near selection
+    const tooltip = page.getByTestId('highlight-tooltip');
+    await expect(tooltip).toBeVisible();
+    await expect(tooltip).toContainText('Add feedback?');
+    
+    // Tooltip should be positioned near the selection
+    const tooltipBox = await tooltip.boundingBox();
+    const paragraphBox = await paragraph.boundingBox();
+    expect(tooltipBox.y).toBeGreaterThan(paragraphBox.y);
+  });
+  ```
+- [ ] Create `highlight.ts` module with Selection API integration
+- [ ] Add mouseup/touchend event listeners for text selection detection
+- [ ] Add tooltip positioning logic using getBoundingClientRect()
+- [ ] Add mobile touch selection support
+- [ ] Make text selection test pass
+
+### Highlight UI & Context Capture
+- [ ] **TEST**: Highlight tooltip captures context and integrates with modal
+  ```typescript
+  test('highlight tooltip captures DOM context and opens modal', async ({ page }) => {
+    await page.goto('/docs/getting-started');
+    
+    // Select text within a specific section
+    const heading = page.locator('h2:has-text("Installation")');
+    const paragraph = heading.locator('+ p');
+    await paragraph.selectText();
+    
+    // Click the highlight tooltip
+    await page.getByTestId('highlight-tooltip').click();
+    
+    // Modal should open with pre-filled context
+    const modal = page.getByTestId('feedback-modal');
+    await expect(modal).toBeVisible();
+    
+    // Should include selected text
+    const selectedText = page.getByTestId('selected-text');
+    await expect(selectedText).toContainText(await paragraph.innerText());
+    
+    // Should include section context
+    const contextInfo = page.getByTestId('context-info');
+    await expect(contextInfo).toContainText('Installation');
+  });
+  ```
+- [ ] Implement tooltip UI component with proper styling
+- [ ] Add DOM context capture (nearest heading, section ID, page position)
+- [ ] Add selected text storage and quote formatting
+- [ ] Add integration with FeedbackModal to pre-fill data
+- [ ] Add cleanup logic to remove tooltip on interaction end
+- [ ] Make highlight context test pass
+
+### Cross-Browser Selection Handling
+- [ ] **TEST**: Text selection works across all browsers and devices
+  ```typescript
+  test('text selection works in all browsers', async ({ page, browserName }) => {
+    await page.goto('/docs/getting-started');
+    
+    // Test different selection methods per browser
+    const paragraph = page.locator('p').first();
+    
+    if (browserName === 'webkit') {
+      // Safari-specific selection handling
+      await paragraph.dblclick(); // Double-click to select word
+    } else {
+      await paragraph.selectText();
+    }
+    
+    const tooltip = page.getByTestId('highlight-tooltip');
+    await expect(tooltip).toBeVisible();
+    
+    // Test ESC key dismisses tooltip
+    await page.keyboard.press('Escape');
+    await expect(tooltip).not.toBeVisible();
+  });
+  ```
+- [ ] Add browser-specific selection handling (Safari, Firefox, Chrome differences)
+- [ ] Add keyboard accessibility for text selection annotations
+- [ ] Add support for programmatic selection (double-click, select-all scenarios)
+- [ ] Add mobile touch selection optimization
+- [ ] Make cross-browser selection test pass
+
+### Performance Optimization
+- [ ] **TEST**: Text selection doesn't impact page performance
+  ```typescript
+  test('text selection system has minimal performance impact', async ({ page }) => {
+    await page.goto('/docs/getting-started');
+    
+    // Measure initial performance
+    const startMetrics = await page.evaluate(() => {
+      return performance.getEntriesByType('measure');
+    });
+    
+    // Perform multiple text selections rapidly
+    for (let i = 0; i < 10; i++) {
+      await page.locator('p').nth(i).selectText();
+      await page.keyboard.press('Escape'); // Dismiss tooltip
+    }
+    
+    // Check that performance hasn't degraded
+    const endMetrics = await page.evaluate(() => {
+      return performance.getEntriesByType('measure');
+    });
+    
+    // Should not have created excessive DOM elements or memory leaks
+    const elementCount = await page.locator('*').count();
+    expect(elementCount).toBeLessThan(1000); // Reasonable DOM size
+  });
+  ```
+- [ ] Add debounced event handling to prevent excessive tooltip creation
+- [ ] Add memory cleanup for event listeners and DOM elements
+- [ ] Add performance monitoring for large document handling
+- [ ] Add virtual scrolling considerations for long pages
+- [ ] Make performance optimization test pass
+
+### Modal Redesign for Highlighting Workflow
+- [ ] **TEST**: Modal redesign optimizes for tag + highlight + optional text workflow
+  ```typescript
+  test('redesigned modal supports optimal feedback workflow in header/footer layout', async ({ page }) => {
+    await page.goto('/docs/getting-started');
+    
+    // Test modal opens in header configuration
+    await page.getByTestId('feedback-widget').click();
+    
+    const modal = page.getByTestId('feedback-modal');
+    await expect(modal).toBeVisible();
+    
+    // Modal should be positioned as header/footer, not center overlay
+    const modalBox = await modal.boundingBox();
+    const pageHeight = await page.evaluate(() => window.innerHeight);
+    
+    // Should be at top (header) or bottom (footer), not center
+    expect(modalBox.y < 100 || modalBox.y > pageHeight - 200).toBe(true);
+    
+    // Should allow page content to be visible for highlighting
+    const pageContent = page.locator('main');
+    await expect(pageContent).toBeVisible();
+    
+    // Test workflow: Quick tag selection (preferred path)
+    await page.getByTestId('quick-tag-button-typo').click();
+    await expect(page.getByText('Thank you for your feedback!')).toBeVisible();
+  });
+  
+  test('modal supports tag + highlight workflow optimization', async ({ page }) => {
+    await page.goto('/docs/getting-started');
+    await page.getByTestId('feedback-widget').click();
+    
+    // User selects text while modal is open
+    const paragraph = page.locator('p').first();
+    await paragraph.selectText();
+    
+    // Modal should update to show selected text
+    const selectedPreview = page.getByTestId('selected-text-preview');
+    await expect(selectedPreview).toBeVisible();
+    await expect(selectedPreview).toContainText(await paragraph.innerText());
+    
+    // Quick tag selection with highlight (optimal path)
+    await page.getByTestId('quick-tag-button-confusing').click();
+    
+    // Should submit with both tag and highlight
+    await expect(page.getByText('Thank you for your feedback!')).toBeVisible();
+  });
+  
+  test('modal supports full workflow with freeform text', async ({ page }) => {
+    await page.goto('/docs/getting-started');
+    await page.getByTestId('feedback-widget').click();
+    
+    // Select text
+    const paragraph = page.locator('p').first();
+    await paragraph.selectText();
+    
+    // Choose tag
+    await page.getByTestId('category-select').selectOption('Other');
+    
+    // Should reveal freeform text area
+    const textArea = page.getByTestId('comment-textarea');
+    await expect(textArea).toBeVisible();
+    
+    // Fill detailed feedback
+    await textArea.fill('This section could use more specific examples about X, Y, and Z');
+    
+    // Submit comprehensive feedback
+    await page.getByTestId('submit-button').click();
+    await expect(page.getByText('Thank you for your feedback!')).toBeVisible();
+  });
+  ```
+- [ ] Redesign modal layout from center overlay to configurable header/footer
+- [ ] Add layout configuration option (header vs footer positioning)
+- [ ] Implement quick tag selection buttons for instant feedback submission
+- [ ] Add real-time selected text preview within modal
+- [ ] Add progressive disclosure: tags → tags+highlight → tags+highlight+text
+- [ ] Add visual feedback flow guidance to steer users toward preferred patterns
+- [ ] Optimize mobile experience for header/footer modal layout
+- [ ] Add keyboard shortcuts for quick tag selection
+- [ ] Make modal redesign workflow test pass
+
+---
+
+## Milestone 8: Inline "Confused?" Links & Category Management
+
+### Strategic Link Placement
+- [ ] **TEST**: Inline links appear in strategic locations
+  ```typescript
+  test('confused links appear after code blocks and sections', async ({ page }) => {
+    await page.goto('/docs/getting-started');
+    
+    // Should appear after code blocks
+    const codeBlocks = page.locator('pre');
+    const count = await codeBlocks.count();
+    
+    for (let i = 0; i < count; i++) {
+      const codeBlock = codeBlocks.nth(i);
+      const confusedLink = codeBlock.locator('+ .confused-link');
+      await expect(confusedLink).toBeVisible();
+      await expect(confusedLink).toContainText('Confused?');
+    }
+    
+    // Should appear at end of major sections
+    const sections = page.locator('section');
+    const sectionCount = await sections.count();
+    expect(sectionCount).toBeGreaterThan(0);
+  });
+  ```
+- [ ] Implement automatic insertion after code blocks using remark/rehype plugins
+- [ ] Add section-end insertion logic with configurable strategy
+- [ ] Add manual shortcode support for explicit placement (`:::confused` syntax)
+- [ ] Add configuration options for insertion frequency and targeting
+- [ ] Make strategic placement test pass
+
+### Contextual Feedback Triggering
+- [ ] **TEST**: Inline links provide section-specific context
+  ```typescript
+  test('confused links capture section context accurately', async ({ page }) => {
+    await page.goto('/docs/getting-started');
+    
+    // Find a confused link after a specific section
+    const installSection = page.locator('h2:has-text("Installation")');
+    const confusedLink = installSection.locator('~ .confused-link').first();
+    
+    await confusedLink.click();
+    
+    // Modal should open with section context
+    const modal = page.getByTestId('feedback-modal');
+    await expect(modal).toBeVisible();
+    
+    // Should pre-fill with section information
+    const contextField = page.getByTestId('section-context');
+    await expect(contextField).toHaveValue('Installation');
+    
+    // Should suggest relevant categories
+    const categorySelect = page.getByRole('combobox', { name: 'Category' });
+    await expect(categorySelect).toContainText('Confusing');
+    await expect(categorySelect).toContainText('Missing info');
+  });
+  ```
+- [ ] Add section context detection and storage
+- [ ] Add smart category suggestion based on placement context
+- [ ] Add page position tracking for analytics
+- [ ] Add A/B testing framework for link placement optimization
+- [ ] Make contextual triggering test pass
+
+### Dynamic Category Management
+- [ ] **TEST**: Categories are configurable and extensible
+  ```typescript
+  test('category system supports dynamic configuration', async () => {
+    const categoryManager = new CategoryManager({
+      defaultCategories: ['Typo', 'Confusing', 'Outdated', 'Missing'],
+      allowCustomTags: true,
+      adminEmail: 'admin@starmark.dev'
+    });
+    
+    // Test category validation
+    expect(categoryManager.isValidCategory('Typo')).toBe(true);
+    expect(categoryManager.isValidCategory('CustomTag')).toBe(false);
+    
+    // Test custom tag suggestion
+    const suggestion = await categoryManager.suggestCategory('This is too slow');
+    expect(suggestion).toBe('Performance');
+    
+    // Test category analytics
+    const stats = await categoryManager.getCategoryStats();
+    expect(stats).toHaveProperty('mostUsed');
+    expect(stats).toHaveProperty('suggestions');
+  });
+  ```
+- [ ] Implement `CategoryManager` class with configurable categories
+- [ ] Add custom tag suggestion system with admin approval workflow
+- [ ] Add category analytics and usage tracking
+- [ ] Add smart categorization using basic NLP (keyword matching)
+- [ ] Add category localization support
+- [ ] Make dynamic category test pass
+
+### Admin Category Management
+- [ ] **TEST**: Admins can manage categories through interface
+  ```typescript
+  test('admin interface allows category management', async ({ page }) => {
+    // Login as admin user
+    await loginAsAdmin(page);
+    await page.goto('/admin/categories');
+    
+    // Should show category management interface
+    const categoryList = page.getByTestId('category-list');
+    await expect(categoryList).toBeVisible();
+    
+    // Should allow adding new categories
+    await page.fill('[data-testid="new-category-name"]', 'Performance');
+    await page.fill('[data-testid="new-category-description"]', 'Issues related to speed and performance');
+    await page.click('[data-testid="add-category"]');
+    
+    // Should appear in list
+    await expect(page.getByText('Performance')).toBeVisible();
+    
+    // Should allow editing existing categories
+    const editButton = page.getByTestId('edit-category-Typo');
+    await editButton.click();
+    // ... edit workflow tests
+  });
+  ```
+- [ ] Create admin interface for category management (optional, may defer to manual config)
+- [ ] Add category approval workflow for user suggestions
+- [ ] Add category usage analytics dashboard
+- [ ] Add bulk category operations (import/export)
+- [ ] Make admin category management test pass
+
+---
+
+## Milestone 9: UI Polish, Accessibility & Internationalization
+
+### WCAG 2.2 AA Compliance
+- [ ] **TEST**: All components meet WCAG 2.2 AA standards
+  ```typescript
+  test('accessibility compliance across all components', async ({ page }) => {
+    await page.goto('/docs/getting-started');
+    
+    // Run automated accessibility scan
+    const accessibilityResults = await page.accessibility.snapshot();
+    
+    // Test keyboard navigation
+    await page.keyboard.press('Tab'); // Should focus widget
+    await expect(page.getByTestId('feedback-widget')).toBeFocused();
+    
+    await page.keyboard.press('Enter'); // Should open modal
+    await expect(page.getByTestId('feedback-modal')).toBeVisible();
+    
+    await page.keyboard.press('Tab'); // Should focus first form field
+    await expect(page.getByRole('combobox', { name: 'Category' })).toBeFocused();
+    
+    // Test screen reader labels
+    const widget = page.getByTestId('feedback-widget');
+    await expect(widget).toHaveAttribute('aria-label', 'Open feedback form');
+    
+    // Test color contrast (should be tested via CSS analysis)
+    const widgetStyles = await widget.evaluate(el => getComputedStyle(el));
+    // Add contrast ratio validation here
+  });
+  ```
+- [ ] Add comprehensive ARIA labels and roles to all components
+- [ ] Add keyboard navigation with proper focus management
+- [ ] Add screen reader optimization with descriptive text
+- [ ] Add color contrast validation (4.5:1 minimum ratio)
+- [ ] Add reduced motion support for animations
+- [ ] Make WCAG compliance test pass
+
+### Advanced Focus Management
+- [ ] **TEST**: Focus management works perfectly across all interactions
+  ```typescript
+  test('focus management in complex interaction flows', async ({ page }) => {
+    await page.goto('/docs/getting-started');
+    
+    // Test focus trap in modal
+    await page.getByTestId('feedback-widget').click();
+    const modal = page.getByTestId('feedback-modal');
+    await expect(modal).toBeVisible();
+    
+    // Tab through all form elements
+    const formElements = ['category', 'comment', 'submit', 'cancel'];
+    for (const element of formElements) {
+      await page.keyboard.press('Tab');
+      await expect(page.getByTestId(element)).toBeFocused();
+    }
+    
+    // Tab again should wrap to first element
+    await page.keyboard.press('Tab');
+    await expect(page.getByRole('combobox', { name: 'Category' })).toBeFocused();
+    
+    // Shift+Tab should go backwards
+    await page.keyboard.press('Shift+Tab');
+    await expect(page.getByTestId('cancel')).toBeFocused();
+    
+    // ESC should close and return focus to widget
+    await page.keyboard.press('Escape');
+    await expect(modal).not.toBeVisible();
+    await expect(page.getByTestId('feedback-widget')).toBeFocused();
+  });
+  ```
+- [ ] Implement perfect focus trap in modal with proper cycling
+- [ ] Add focus restoration when modal closes
+- [ ] Add skip links for keyboard users
+- [ ] Add focus indicators that meet accessibility guidelines
+- [ ] Add support for assistive technology navigation
+- [ ] Make advanced focus management test pass
+
+### Comprehensive Internationalization
+- [ ] **TEST**: Full i18n support with RTL languages
+  ```typescript
+  test('internationalization works for multiple languages and RTL', async ({ page }) => {
+    // Test English (default)
+    await page.goto('/docs/getting-started');
+    await page.getByTestId('feedback-widget').click();
+    await expect(page.getByRole('heading', { name: 'Send Feedback' })).toBeVisible();
+    
+    // Test Spanish
+    await page.goto('/es/docs/getting-started');
+    await page.getByTestId('feedback-widget').click();
+    await expect(page.getByRole('heading', { name: 'Enviar Comentarios' })).toBeVisible();
+    
+    // Test Arabic (RTL)
+    await page.goto('/ar/docs/getting-started');
+    await page.getByTestId('feedback-widget').click();
+    const modal = page.getByTestId('feedback-modal');
+    await expect(modal).toHaveCSS('direction', 'rtl');
+    await expect(page.getByRole('heading', { name: 'إرسال تعليقات' })).toBeVisible();
+    
+    // Test category translations
+    const categorySelect = page.getByRole('combobox', { name: /الفئة|Category/ });
+    await categorySelect.click();
+    await expect(page.getByText('خطأ إملائي')).toBeVisible(); // "Typo" in Arabic
+  });
+  ```
+- [ ] Add comprehensive translation files for 10+ languages
+- [ ] Add RTL (Right-to-Left) language support with proper CSS
+- [ ] Add number and date formatting per locale
+- [ ] Add dynamic language switching support
+- [ ] Add translation management workflow with tools like Crowdin
+- [ ] Make comprehensive i18n test pass
+
+### Performance & Core Web Vitals
+- [ ] **TEST**: Plugin meets Core Web Vitals standards
+  ```typescript
+  test('plugin meets Core Web Vitals performance standards', async ({ page }) => {
+    await page.goto('/docs/getting-started');
+    
+    // Measure performance metrics
+    const metrics = await page.evaluate(() => {
+      return new Promise(resolve => {
+        new PerformanceObserver(list => {
+          const entries = list.getEntries();
+          resolve({
+            lcp: entries.find(entry => entry.entryType === 'largest-contentful-paint')?.startTime,
+            fid: entries.find(entry => entry.entryType === 'first-input')?.processingStart,
+            cls: entries.find(entry => entry.entryType === 'layout-shift')?.value
+          });
+        }).observe({ entryTypes: ['largest-contentful-paint', 'first-input', 'layout-shift'] });
+      });
+    });
+    
+    // Verify Core Web Vitals thresholds
+    expect(metrics.lcp).toBeLessThan(2500); // LCP < 2.5s
+    expect(metrics.cls).toBeLessThan(0.1);  // CLS < 0.1
+    // FID < 100ms (tested during interaction)
+    
+    // Test bundle size impact
+    const resources = await page.evaluate(() => {
+      return performance.getEntriesByType('resource')
+        .filter(r => r.name.includes('starmark'))
+        .reduce((total, r) => total + r.transferSize, 0);
+    });
+    
+    expect(resources).toBeLessThan(50000); // Plugin < 50KB total
+  });
+  ```
+- [ ] Optimize JavaScript bundle size (< 50KB total)
+- [ ] Add lazy loading for non-critical components
+- [ ] Optimize CSS for minimal render blocking
+- [ ] Add resource hints (preload, prefetch) for critical assets
+- [ ] Add performance monitoring and alerting
+- [ ] Make performance standards test pass
+
+### Dark Mode & Theme Integration
+- [ ] **TEST**: Perfect theme integration with Starlight
+  ```typescript
+  test('theme integration works perfectly with Starlight themes', async ({ page }) => {
+    await page.goto('/docs/getting-started');
+    
+    // Test light mode
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+    const widget = page.getByTestId('feedback-widget');
+    const lightBg = await widget.evaluate(el => getComputedStyle(el).backgroundColor);
+    
+    // Switch to dark mode
+    await page.getByRole('button', { name: 'Toggle dark mode' }).click();
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+    const darkBg = await widget.evaluate(el => getComputedStyle(el).backgroundColor);
+    
+    // Colors should be different and appropriate
+    expect(lightBg).not.toBe(darkBg);
+    
+    // Test custom theme compatibility
+    await page.goto('/docs/getting-started?theme=custom');
+    const customBg = await widget.evaluate(el => getComputedStyle(el).backgroundColor);
+    // Should adapt to custom theme variables
+  });
+  ```
+- [ ] Add seamless dark/light mode transitions
+- [ ] Add support for custom Starlight themes
+- [ ] Add high contrast mode support
+- [ ] Add theme-aware SVG icons and graphics
+- [ ] Make theme integration test pass
+
+---
+
+## Milestone 10: Documentation, Examples & Open Source Release
+
+### Comprehensive Documentation Site
+- [ ] **TEST**: Documentation is complete and accurate
+  ```typescript
+  test('documentation covers all features with working examples', async ({ page }) => {
+    await page.goto('/docs');
+    
+    // Should have complete navigation
+    const nav = page.getByRole('navigation');
+    await expect(nav).toContainText('Quick Start');
+    await expect(nav).toContainText('Configuration');
+    await expect(nav).toContainText('Authentication');
+    await expect(nav).toContainText('Storage Connectors');
+    await expect(nav).toContainText('Customization');
+    await expect(nav).toContainText('API Reference');
+    
+    // Test interactive examples
+    await page.goto('/docs/examples/basic');
+    const liveExample = page.getByTestId('live-example');
+    await expect(liveExample).toBeVisible();
+    
+    // Example should have working feedback widget
+    await liveExample.getByTestId('feedback-widget').click();
+    await expect(page.getByTestId('feedback-modal')).toBeVisible();
+  });
+  ```
+- [ ] Create comprehensive installation and setup guides
+- [ ] Add interactive examples and live demos
+- [ ] Add complete API reference with TypeScript definitions
+- [ ] Add troubleshooting guides and FAQ
+- [ ] Add migration guides for different versions
+- [ ] Make documentation completeness test pass
+
+### Integration Examples & Templates
+- [ ] **TEST**: Integration examples work out of the box
+  ```typescript
+  test('integration examples can be followed successfully', async () => {
+    // Test that example configurations are valid
+    const examples = [
+      'basic-astro-site',
+      'with-auth0',
+      'with-linear-github',
+      'multilingual-site',
+      'custom-theme'
+    ];
+    
+    for (const example of examples) {
+      const config = await import(`../examples/${example}/astro.config.mjs`);
+      expect(config.default).toBeDefined();
+      expect(config.default.integrations).toContain(expect.objectContaining({
+        name: expect.stringContaining('starmark')
+      }));
+    }
+  });
+  ```
+- [ ] Create 5+ complete integration examples
+- [ ] Add Codesandbox/StackBlitz templates for quick testing
+- [ ] Add video tutorials for complex setups
+- [ ] Add example configurations for popular Astro themes
+- [ ] Make integration examples test pass
+
+### Open Source Release Preparation
+- [ ] **TEST**: Package is ready for npm publication
+  ```typescript
+  test('package meets npm publication standards', async () => {
+    const packageJson = await import('../starmark-integration/package.json');
+    
+    // Required fields
+    expect(packageJson.name).toBe('@starmark/integration');
+    expect(packageJson.version).toMatch(/^\d+\.\d+\.\d+$/);
+    expect(packageJson.description).toBeDefined();
+    expect(packageJson.keywords).toContain('astro');
+    expect(packageJson.license).toBe('MIT');
+    expect(packageJson.repository).toBeDefined();
+    
+    // Build outputs
+    expect(packageJson.main).toBe('dist/index.js');
+    expect(packageJson.types).toBe('dist/index.d.ts');
+    expect(packageJson.files).toContain('dist');
+    
+    // Dependencies are appropriate
+    expect(packageJson.peerDependencies).toHaveProperty('astro');
+    expect(packageJson.peerDependencies).toHaveProperty('@astrojs/starlight');
+  });
+  ```
+- [ ] Add MIT license and contributor agreements
+- [ ] Set up Changesets for version management and changelogs
+- [ ] Add GitHub release automation with assets
+- [ ] Add npm provenance and security scanning
+- [ ] Add contributor guidelines and code of conduct
+- [ ] Make npm publication test pass
+
+### Community & Maintenance Setup
+- [ ] **TEST**: Community infrastructure is functional
+  ```typescript
+  test('community infrastructure supports contributors', async () => {
+    // Test issue templates exist
+    const issueTemplates = await fs.readdir('.github/ISSUE_TEMPLATE');
+    expect(issueTemplates).toContain('bug_report.yml');
+    expect(issueTemplates).toContain('feature_request.yml');
+    
+    // Test PR template exists
+    const prTemplate = await fs.readFile('.github/pull_request_template.md', 'utf8');
+    expect(prTemplate).toContain('checklist');
+    expect(prTemplate).toContain('breaking changes');
+    
+    // Test discussion categories are configured
+    const discussions = await github.rest.repos.getRepoDiscussions({
+      owner: 'starmark',
+      repo: 'astro-starmark'
+    });
+    expect(discussions.data).toBeDefined();
+  });
+  ```
+- [ ] Set up GitHub Discussions for community Q&A
+- [ ] Add issue and PR templates with proper labeling
+- [ ] Set up automated dependency updates (Dependabot/Renovate)
+- [ ] Add security policy and vulnerability reporting
+- [ ] Set up community health files and governance
+- [ ] Make community infrastructure test pass
+
+### Analytics & Adoption Tracking
+- [ ] **TEST**: Plugin adoption can be monitored ethically
+  ```typescript
+  test('adoption analytics respect privacy', async () => {
+    const analytics = new AdoptionAnalytics({
+      anonymizeData: true,
+      optOut: true,
+      gdprCompliant: true
+    });
+    
+    // Should track basic usage patterns anonymously
+    const stats = await analytics.getUsageStats();
+    expect(stats).toHaveProperty('installations');
+    expect(stats).toHaveProperty('activeFeatures');
+    
+    // Should not contain PII
+    expect(JSON.stringify(stats)).not.toMatch(/email|ip|user/i);
+    
+    // Should respect opt-out
+    analytics.optOut();
+    const noStats = await analytics.getUsageStats();
+    expect(noStats).toBeNull();
+  });
+  ```
+- [ ] Add privacy-respecting usage analytics
+- [ ] Set up npm download monitoring and GitHub stars tracking
+- [ ] Add plugin health monitoring (error rates, performance)
+- [ ] Create community metrics dashboard
+- [ ] Make ethical analytics test pass
 
 Remember: Each checkbox should only be checked AFTER the corresponding test passes! 
