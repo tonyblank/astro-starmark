@@ -1,11 +1,14 @@
 ---
 import Default from "@astrojs/starlight/components/Footer.astro";
 import FeedbackWidget from "../../../starmark-integration/src/client/FeedbackWidget.astro";
+import FeedbackModal from "../../../starmark-integration/src/client/FeedbackModal.astro";
+import { DEFAULT_FEEDBACK_CATEGORIES } from "../../../starmark-integration/src/constants.ts";
 ---
 
 <Default {...Astro.props} />
 <FeedbackWidget
-  categories={["Bug", "Feature Request", "Question", "Typo"]}
+  categories={DEFAULT_FEEDBACK_CATEGORIES}
   position="bottom-right"
   text="Feedback"
 />
+<FeedbackModal categories={DEFAULT_FEEDBACK_CATEGORIES} />

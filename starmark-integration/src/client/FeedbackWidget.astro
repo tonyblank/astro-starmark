@@ -1,9 +1,12 @@
 ---
+import "../types.ts"; // Import for global Window interface extensions
+import { DEFAULT_FEEDBACK_CATEGORIES } from "../constants.ts";
+
 export interface Props {
   /**
    * Categories available in the feedback form
    */
-  categories?: string[];
+  categories?: readonly string[];
 
   /**
    * Position of the widget on the page
@@ -17,7 +20,7 @@ export interface Props {
 }
 
 const {
-  categories = ["Bug", "Feature Request", "Question", "Typo"],
+  categories = DEFAULT_FEEDBACK_CATEGORIES,
   position = "bottom-right",
   text = "Feedback",
 } = Astro.props;
@@ -39,8 +42,22 @@ const widgetCategories = categories;
 </button>
 
 <style>
+  /* Prevent Starlight's right-sidebar from interfering with widget clicks */
+  :global(.right-sidebar-container),
+  :global(.right-sidebar) {
+    /* Allow pointer events to pass through to elements behind */
+    pointer-events: none;
+  }
+
+  /* Re-enable pointer events for interactive elements within the sidebar */
+  :global(.right-sidebar-container *),
+  :global(.right-sidebar *) {
+    pointer-events: auto;
+  }
+
+  /* Use body-relative positioning to avoid layout interference - established best practice */
   .feedback-widget {
-    position: fixed;
+    position: fixed; /* Changed back to fixed since we're teleporting to body */
     background: var(--sl-color-accent);
     color: var(--sl-color-white);
     border: none;
@@ -50,13 +67,20 @@ const widgetCategories = categories;
     font-family: var(--sl-font);
     font-size: var(--sl-text-sm);
     font-weight: 600;
-    z-index: 1000;
+    z-index: 999999;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
     transition: all 0.2s ease;
     display: flex;
     align-items: center;
     gap: 8px;
+    /* Ensure the widget itself can receive pointer events */
     pointer-events: auto;
+    /* Create isolation to prevent stacking context issues */
+    isolation: isolate;
+    /* Force hardware acceleration for better performance */
+    transform: translateZ(0);
+    /* Ensure it's clickable by preventing interference */
+    touch-action: manipulation;
   }
 
   .feedback-widget:hover {
@@ -68,26 +92,6 @@ const widgetCategories = categories;
   .feedback-widget:focus {
     outline: 2px solid var(--sl-color-accent);
     outline-offset: 2px;
-  }
-
-  .feedback-widget--bottom-right {
-    bottom: 24px;
-    right: 24px;
-  }
-
-  .feedback-widget--bottom-left {
-    bottom: 24px;
-    left: 24px;
-  }
-
-  .feedback-widget--top-right {
-    top: 24px;
-    right: 24px;
-  }
-
-  .feedback-widget--top-left {
-    top: 24px;
-    left: 24px;
   }
 
   .feedback-widget__text {
@@ -139,11 +143,10 @@ const widgetCategories = categories;
 <script>
   // Client-side interactivity with proper cleanup
   (function () {
-    // Use type assertion to safely access window property
-    const windowWithStarmark = window as any;
+    // Use properly typed window interface
 
     // Prevent multiple initializations
-    if (windowWithStarmark.starmarkFeedbackWidget) {
+    if (window.starmarkFeedbackWidget) {
       return;
     }
 
@@ -155,7 +158,40 @@ const widgetCategories = categories;
     function handleClick() {
       if (!widget) return;
 
-      // TODO: Open feedback modal
+      // Open feedback modal if available
+      if (window.starmarkFeedbackModal) {
+        window.starmarkFeedbackModal.open();
+      } else {
+        // Modal not ready yet, use exponential backoff retry mechanism
+        waitForModal();
+      }
+    }
+
+    function waitForModal(
+      maxRetries: number = 5,
+      baseDelay: number = 50,
+      maxDelay: number = 2000,
+      currentRetry: number = 0,
+    ): void {
+      if (window.starmarkFeedbackModal) {
+        window.starmarkFeedbackModal.open();
+        return;
+      }
+
+      if (currentRetry >= maxRetries) {
+        console.warn("StarMark: Feedback modal not available after retries");
+        return;
+      }
+
+      // Calculate exponential backoff delay with jitter
+      const delay = Math.min(
+        baseDelay * Math.pow(2, currentRetry) + Math.random() * 10,
+        maxDelay,
+      );
+
+      setTimeout(() => {
+        waitForModal(maxRetries, baseDelay, maxDelay, currentRetry + 1);
+      }, delay);
     }
 
     function handleKeydown(event: KeyboardEvent) {
@@ -179,6 +215,15 @@ const widgetCategories = categories;
         // Mark as initialized
         widget.setAttribute("data-script-loaded", "true");
 
+        // Portal/teleport the widget to document.body to escape layout containers
+        // This is the most reliable solution for floating widgets
+        if (widget.parentElement !== document.body) {
+          document.body.appendChild(widget);
+        }
+
+        // Position widget relative to viewport using fixed positioning
+        updateWidgetPosition();
+
         // Store handler references for cleanup
         clickHandler = handleClick;
         keydownHandler = handleKeydown;
@@ -186,6 +231,42 @@ const widgetCategories = categories;
         // Add event listeners - use onclick for better Playwright compatibility
         widget.onclick = clickHandler;
         widget.addEventListener("keydown", keydownHandler);
+
+        // Update position on scroll and resize
+        window.addEventListener("scroll", updateWidgetPosition);
+        window.addEventListener("resize", updateWidgetPosition);
+      }
+    }
+
+    function updateWidgetPosition() {
+      if (!widget) return;
+
+      // Use fixed positioning since we're now in document.body
+      widget.style.position = "fixed";
+
+      // Position relative to the viewport
+      const position = widget.className.includes("bottom-right")
+        ? "bottom-right"
+        : widget.className.includes("bottom-left")
+          ? "bottom-left"
+          : widget.className.includes("top-right")
+            ? "top-right"
+            : "top-left";
+
+      if (position.includes("bottom")) {
+        widget.style.bottom = "24px";
+        widget.style.top = "auto";
+      } else {
+        widget.style.top = "24px";
+        widget.style.bottom = "auto";
+      }
+
+      if (position.includes("right")) {
+        widget.style.right = "24px";
+        widget.style.left = "auto";
+      } else {
+        widget.style.left = "24px";
+        widget.style.right = "auto";
       }
     }
 
@@ -193,6 +274,8 @@ const widgetCategories = categories;
       if (widget && clickHandler && keydownHandler) {
         widget.onclick = null;
         widget.removeEventListener("keydown", keydownHandler);
+        window.removeEventListener("scroll", updateWidgetPosition);
+        window.removeEventListener("resize", updateWidgetPosition);
         widget = null;
         clickHandler = null;
         keydownHandler = null;
@@ -209,7 +292,7 @@ const widgetCategories = categories;
     }
 
     // Expose cleanup function globally for proper teardown
-    windowWithStarmark.starmarkFeedbackWidget = {
+    window.starmarkFeedbackWidget = {
       cleanup: cleanup,
       initialized: true,
     };
