@@ -67,7 +67,7 @@ async function mockFeedbackEndpoint(request: Request): Promise<Response> {
 
     const response: FeedbackSubmissionResponse = {
       success: true,
-      id: `feedback-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      id: `feedback-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`,
       message: 'Feedback submitted successfully'
     };
 

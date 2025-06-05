@@ -15,7 +15,7 @@
     "dev": "turbo dev",
     "test": "turbo test",
     "test:unit": "turbo test:unit",
-    "test:component": "turbo test:component", 
+    "test:component": "turbo test:component",
     "test:integration": "turbo test:integration",
     "test:e2e": "turbo test:e2e",
     "test:watch": "turbo test:unit --watch",
@@ -35,7 +35,7 @@
   },
   "devDependencies": {
     "@changesets/cli": "^2.27.1",
-    "turbo": "^1.12.4"
+    "turbo": "^2.5.4"
   },
   "workspaces": [
     "starmark-integration",
@@ -46,4 +46,4 @@
       "esbuild": ">=0.25.0"
     }
   }
-} 
+}

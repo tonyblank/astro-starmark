@@ -1,4 +1,4 @@
-import { describe, test, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, test, expect, beforeEach, afterEach, afterAll, vi } from 'vitest';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import type { FeedbackData, FeedbackSubmissionResponse } from '../src/feedback-data.js';
@@ -229,7 +229,7 @@ describe('Frontend API Integration', () => {
     expect(new Date(collectedData.timestamp).toISOString()).toBe(collectedData.timestamp);
   });
 
-  test('includes all optional fields when provided', async () => {
+  test('includes optional fields when provided by form', async () => {
     const formData = new FormData();
     formData.set('category', 'Other');
     formData.set('comment', 'Test with suggested tag');
@@ -242,14 +242,14 @@ describe('Frontend API Integration', () => {
       suggestedTag: formData.get('suggestedTag') || null,
       timestamp: new Date().toISOString(),
       userAgent: (global as any).navigator.userAgent,
-      // Simulate additional optional fields that could be added
-      highlightedText: 'some selected text',
-      sectionId: 'section-introduction'
     };
 
     expect(collectedData.suggestedTag).toBe('documentation-clarity');
-    expect(collectedData.highlightedText).toBe('some selected text');
-    expect(collectedData.sectionId).toBe('section-introduction');
+    expect(collectedData.page).toBe('/docs/getting-started');
+    expect(collectedData.category).toBe('Other');
+    expect(collectedData.comment).toBe('Test with suggested tag');
+    expect(collectedData.timestamp).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
+    expect(collectedData.userAgent).toBe('test-agent');
   });
 
   test('properly formats API request headers and body', async () => {

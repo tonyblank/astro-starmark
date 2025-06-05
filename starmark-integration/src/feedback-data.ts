@@ -2,6 +2,9 @@ import { z } from "zod";
 
 // Category enum for feedback types
 export const FeedbackCategory = z.enum([
+  "Bug",
+  "Feature Request",
+  "Question",
   "Typo",
   "Confusing",
   "Outdated",
@@ -23,7 +26,9 @@ export const FeedbackSchema = z.object({
     .string()
     .min(1, "Comment is required")
     .max(5000, "Comment must be less than 5000 characters"),
-  timestamp: z.string().datetime("Timestamp must be a valid ISO datetime"),
+  timestamp: z.string().datetime({
+    message: "Timestamp must be a valid ISO datetime",
+  }),
   userAgent: z.string().min(1, "User agent is required"),
 
   // Optional fields

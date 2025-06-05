@@ -1,0 +1,35 @@
+name = "starmark-dev"
+pages_build_output_dir = "./dist"
+compatibility_date = "2025-01-05"
+
+# KV namespace configuration
+# IMPORTANT: Replace environment variables with actual KV namespace IDs
+# 
+# To get KV namespace IDs:
+# 1. Create KV namespaces: `pnpm wrangler kv:namespace create SESSION`
+# 2. For preview: `pnpm wrangler kv:namespace create SESSION --preview`
+# 3. Set environment variables in your deployment system or .env file
+#
+# Environment variables needed:
+# - SESSION_KV_ID: Your main KV namespace ID
+# - SESSION_KV_PREVIEW_ID: Your preview KV namespace ID  
+# - SESSION_KV_PRODUCTION_ID: Your production KV namespace ID
+[[kv_namespaces]]
+binding = "SESSION"
+id = "${SESSION_KV_ID}"
+preview_id = "${SESSION_KV_PREVIEW_ID}"
+
+[env.production]
+name = "starmark-dev"
+
+[[env.production.kv_namespaces]]
+binding = "SESSION"
+id = "${SESSION_KV_PRODUCTION_ID}"
+
+[build]
+command = "pnpm build"
+
+# Example of what the environment variables should look like:
+# SESSION_KV_ID=abcd1234-5678-90ef-ghij-klmnopqrstuv
+# SESSION_KV_PREVIEW_ID=wxyz9876-5432-10ab-cdef-ghijklmnopqr  
+# SESSION_KV_PRODUCTION_ID=prod5678-1234-90ab-cdef-ghijklmnopqr 

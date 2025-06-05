@@ -22,13 +22,15 @@
     "@astrojs/cloudflare": "^12.5.3",
     "@astrojs/starlight": "^0.34.3",
     "astro": "^5.8.2",
-    "starmark-integration": "workspace:*"
+    "starmark-integration": "workspace:*",
+    "uuid": "^11.1.0"
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.3",
     "@eslint/js": "^9.28.0",
     "@playwright/test": "^1.45.0",
     "@types/node": "^20.14.0",
+    "@types/uuid": "^10.0.0",
     "@typescript-eslint/eslint-plugin": "^8.33.0",
     "@typescript-eslint/parser": "^8.33.0",
     "eslint": "^9.5.0",

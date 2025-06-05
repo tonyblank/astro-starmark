@@ -74,10 +74,8 @@ const {
         >
           <option value="">Select a category...</option>
           {
-            categories.map((category, index) => (
-              <option key={`category-${index}`} value={category}>
-                {category}
-              </option>
+            categories.map((category) => (
+              <option value={category}>{category}</option>
             ))
           }
         </select>
@@ -561,24 +559,24 @@ const {
       return;
     }
 
-    let modal = null;
-    let form = null;
-    let categorySelect = null;
-    let suggestedTagField = null;
-    let suggestedTagInput = null;
-    let commentTextarea = null;
-    let characterCounter = null;
-    let closeButton = null;
-    let submitButton = null;
+    let modal: HTMLElement | null = null;
+    let form: HTMLFormElement | null = null;
+    let categorySelect: HTMLSelectElement | null = null;
+    let suggestedTagField: HTMLElement | null = null;
+    let suggestedTagInput: HTMLInputElement | null = null;
+    let commentTextarea: HTMLTextAreaElement | null = null;
+    let characterCounter: HTMLElement | null = null;
+    let closeButton: HTMLButtonElement | null = null;
+    let submitButton: HTMLButtonElement | null = null;
     let originalBodyOverflow = "";
-    let previouslyFocusedElement = null;
+    let previouslyFocusedElement: HTMLElement | null = null;
 
     // Form state
-    let currentState = "idle";
+    let currentState: "idle" | "loading" | "success" | "error" = "idle";
 
     // Callback props from parent component
-    let modalOnClose;
-    let modalOnSubmit;
+    let modalOnClose: (() => void) | undefined;
+    let modalOnSubmit: (() => void | Promise<void>) | undefined;
 
     function initializeModal() {
       modal = document.querySelector('[data-testid="feedback-modal"]');
@@ -739,9 +737,19 @@ const {
 
       // Store callback functions
       modalOnClose =
-        onCloseCallback || (window as any).starmarkFeedbackProps?.onClose;
+        onCloseCallback ||
+        (
+          window as unknown as {
+            starmarkFeedbackProps?: { onClose?: () => void };
+          }
+        ).starmarkFeedbackProps?.onClose;
       modalOnSubmit =
-        onSubmitCallback || (window as any).starmarkFeedbackProps?.onSubmit;
+        onSubmitCallback ||
+        (
+          window as unknown as {
+            starmarkFeedbackProps?: { onSubmit?: () => void };
+          }
+        ).starmarkFeedbackProps?.onSubmit;
 
       // Store current focus
       previouslyFocusedElement = document.activeElement as HTMLElement;
@@ -834,7 +842,7 @@ const {
       return modal?.classList.contains("feedback-modal--open") || false;
     }
 
-    function setFormState(state) {
+    function setFormState(state: "idle" | "loading" | "success" | "error") {
       if (!form) return;
 
       currentState = state;
@@ -874,7 +882,7 @@ const {
       });
     }
 
-    async function handleSubmit(event) {
+    async function handleSubmit(event: Event) {
       event.preventDefault();
       if (!form || currentState === "loading") return;
 
@@ -884,7 +892,14 @@ const {
         // Collect form data
         const formData = new FormData(form);
         const suggestedTag = formData.get("suggestedTag") as string | null;
-        const data: any = {
+        const data: {
+          page: string;
+          category: string;
+          comment: string;
+          timestamp: string;
+          userAgent: string;
+          suggestedTag?: string;
+        } = {
           page: window.location.pathname,
           category: formData.get("category") as string,
           comment: formData.get("comment") as string,

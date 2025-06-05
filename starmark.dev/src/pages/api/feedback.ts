@@ -3,6 +3,7 @@ import {
   FeedbackSchema,
   type FeedbackSubmissionResponse,
 } from "starmark-integration";
+import { v4 as uuidv4 } from "uuid";
 
 // CORS headers for the API endpoint
 const corsHeaders = {
@@ -13,14 +14,6 @@ const corsHeaders = {
 };
 
 export const POST: APIRoute = async ({ request }) => {
-  // Handle CORS preflight requests
-  if (request.method === "OPTIONS") {
-    return new Response(null, {
-      status: 200,
-      headers: corsHeaders,
-    });
-  }
-
   // Only allow POST method
   if (request.method !== "POST") {
     return new Response(
@@ -75,7 +68,7 @@ export const POST: APIRoute = async ({ request }) => {
 
     const response: FeedbackSubmissionResponse = {
       success: true,
-      id: `feedback-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`,
+      id: `feedback-${uuidv4()}`,
       message: "Feedback submitted successfully",
     };
 
@@ -90,18 +83,14 @@ export const POST: APIRoute = async ({ request }) => {
     // Handle Zod validation errors or other errors
     let errorMessage = "Invalid feedback data";
 
-    if (error instanceof Error) {
-      // For Zod errors, provide specific validation messages
-      try {
-        const zodError = JSON.parse(error.message);
-        if (Array.isArray(zodError) && zodError[0]?.message) {
-          errorMessage = zodError[0].message;
-        } else {
-          errorMessage = error.message;
-        }
-      } catch {
-        errorMessage = error.message;
+    // Check if this is a ZodError with issues array
+    if (error && typeof error === "object" && "issues" in error) {
+      const issues = (error as { issues: Array<{ message: string }> }).issues;
+      if (Array.isArray(issues) && issues.length > 0 && issues[0]?.message) {
+        errorMessage = issues[0].message;
       }
+    } else if (error instanceof Error) {
+      errorMessage = error.message;
     }
 
     const response: FeedbackSubmissionResponse = {
