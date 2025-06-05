@@ -162,15 +162,36 @@ const widgetCategories = categories;
       if (window.starmarkFeedbackModal) {
         window.starmarkFeedbackModal.open();
       } else {
-        // Modal not ready yet, try again after a short delay
-        setTimeout(() => {
-          if (window.starmarkFeedbackModal) {
-            window.starmarkFeedbackModal.open();
-          } else {
-            console.warn("StarMark: Feedback modal not available");
-          }
-        }, 100);
+        // Modal not ready yet, use exponential backoff retry mechanism
+        waitForModal();
       }
+    }
+
+    function waitForModal(
+      maxRetries: number = 5,
+      baseDelay: number = 50,
+      maxDelay: number = 2000,
+      currentRetry: number = 0,
+    ): void {
+      if (window.starmarkFeedbackModal) {
+        window.starmarkFeedbackModal.open();
+        return;
+      }
+
+      if (currentRetry >= maxRetries) {
+        console.warn("StarMark: Feedback modal not available after retries");
+        return;
+      }
+
+      // Calculate exponential backoff delay with jitter
+      const delay = Math.min(
+        baseDelay * Math.pow(2, currentRetry) + Math.random() * 10,
+        maxDelay,
+      );
+
+      setTimeout(() => {
+        waitForModal(maxRetries, baseDelay, maxDelay, currentRetry + 1);
+      }, delay);
     }
 
     function handleKeydown(event: KeyboardEvent) {
