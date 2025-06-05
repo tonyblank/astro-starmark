@@ -1,0 +1,404 @@
+# StarMark Feedback Plugin – Product Requirements & Completion Plan
+
+## 1. StarMark Feedback Plugin – Feature Completion PRD
+
+### Overview & Goals
+
+The **StarMark Feedback Plugin** is an Astro Starlight integration that enables users to submit context-aware feedback directly on documentation pages. Its primary goals are to let users highlight text and tag feedback (e.g. mark a snippet as a “Typo” or “Confusing section”), then send that feedback to both a data store and an issue tracker for the docs team to triage. This plugin must seamlessly embed into the docs site’s UI with minimal performance impact, preserving Astro’s static-by-default ethos (no large JS frameworks, use Astro Islands for hydration). Key objectives include an intuitive UI/UX for submitting feedback, an extensible system for handling feedback on the backend (Linear issues, database logging, etc.), and full support for accessibility, localization, and developer customization.
+
+### Features & Specifications
+
+#### Feedback UI Components & Flow
+
+* **Floating Feedback Widget:** A persistent, non-intrusive button or icon appears on each documentation page (e.g. bottom-right corner). This widget invites users to provide feedback. It must be keyboard-focusable and screen-reader accessible (e.g. `<button aria-label="Open feedback form">`). Clicking the widget opens the feedback modal/dialog.
+* **Inline Highlight Trigger:** Users can select text on the page to provide inline feedback. When a text selection is made, the plugin will display a small contextual “Add Feedback” prompt near the selection. This prompt is an entry point to attach the selected snippet to a feedback submission. If the user clicks the prompt, the feedback modal opens (just as if the main widget was clicked) but with the *selected text attached* as the context for the feedback.
+* **Feedback Modal/Dialog:** The plugin provides a modal dialog form for submitting feedback. This modal can be triggered either by the floating widget (for general page feedback) or by selecting text and choosing the inline prompt (for specific snippet feedback). The modal includes:
+
+  * A **Category dropdown** or list for classifying feedback. For example: “Typo”, “Confusing Content”, “Outdated Info”, “Missing Content”, etc. A default category list will be provided, and this list is **configurable by the site owner** via the plugin options.
+  * An **optional free-text comment field** where users can describe the issue or suggestion in their own words. This field may be labeled “Additional details (optional)” and should be a multiline textarea.
+  * An **“Other” tag input** for new tags: If none of the predefined categories fit, users should be able to enter a custom tag/keyword. This input will be treated as a suggested new category (e.g. a user types “UI Issue” as a tag). The UI will treat this as an “Other” category – in the submission data it’s captured as a custom tag.
+  * **Selected text preview:** If the feedback was initiated from a text highlight, the modal should display the selected snippet (e.g. in a quoted block or highlighted area) so the user knows exactly what context they are commenting on.
+  * **Submit and Cancel controls:** A submit button (e.g. “Submit Feedback”) to send, and a cancel button to close the modal without sending. The submit button should be prominent; the cancel can be a simpler text link or secondary button. All labels and messages in the form should be localizable (see i18n).
+* **UI Behavior & Transitions:** Opening the modal should dim or overlay the page content (e.g. add a semi-transparent background) to focus the user on the form. Closing the modal (via cancel, submit, or pressing Esc) should remove the overlay and return focus to the feedback widget (or back to the context it was opened from) for good UX. There should be a visual confirmation on successful submission (e.g. the modal could show a “Thank you for your feedback!” message or simply close and maybe the widget can briefly indicate success). Errors (like network failure) should be handled with a friendly message in the modal.
+
+#### Highlighting & Annotation Mechanism
+
+* **Text Selection Handling:** The plugin will include a lightweight **highlight/annotation module** (see section 2 for the new module’s specs) to manage text selection feedback. When a user selects text in the documentation content, the module should detect the selection (listening to the Selection API events) and provide a prompt for feedback. The selected text may be temporarily highlighted (e.g. with a yellow background) to clearly indicate what is selected.
+* **Inline Prompt:** On text selection, a small tooltip or button (with an icon, e.g. a comment icon) appears near the end of the selected text. This prompt should be positioned in a way that does not obscure the text (above or below the selection). Clicking this prompt initiates the feedback flow for that snippet. If the user clicks elsewhere or presses Escape, the prompt should disappear and the text de-highlight.
+* **Ephemeral Highlights:** The highlight on selected text and the inline prompt are ephemeral UI elements – they should be removed once the user either opens the modal (at which point the modal itself shows the context) or cancels. We do **not** permanently alter the page HTML with persistent annotation markers. The design goal is to avoid cluttering the page or interfering with normal reading once the feedback is submitted or dismissed.
+* **Selection Data Capture:** When feedback is submitted with an attached text selection, the plugin should capture necessary data to identify that text. At minimum, it will send the **exact text snippet** and maybe a CSS selector or path to the location in the page (for potential use on the backend, e.g. including snippet in an issue). We might use a simple approach like sending the snippet string and the page URL (since the docs pages are versioned, the snippet plus URL might be sufficient context). A more advanced anchoring (like Hypothesis uses text position selectors) can be an enhancement, but for v1 a direct snippet string is acceptable to identify what content the feedback is about.
+* **No External Dependencies:** We ruled out using Hypothesis or other third-party annotation systems due to their data silo and UI constraints. Therefore, the highlight/annotation capability will be custom-built and integrated. It should remain lightweight (few hundred lines of JS at most) and **framework-agnostic**, using direct DOM APIs so it can be included in the Astro site without heavy bundles. This custom approach ensures we keep full control over data flow (so highlights go into our Linear/DB pipeline, not an external service).
+
+#### Submission & Backend Integration
+
+* **Data Payload:** Upon form submission, the plugin collects all relevant data into a JSON payload. Fields include:
+
+  * Page identifier: likely the page URL (and possibly the page title).
+  * If present, the highlighted text snippet.
+  * The chosen category (tag) and/or any custom tag text.
+  * The user’s comment text (free-form description).
+  * A timestamp (the plugin can generate or the server can log one).
+  * User identity info (if available via auth, see Auth section below).
+* **Hashing PII:** The plugin should hash or omit any personally identifiable info in the user’s comment on the client side if privacy is a concern (the plan mentioned hashing the comment text to avoid storing raw text if required for privacy). This might be optional based on configuration (for internal feedback, raw text might be fine; for external, a hash might be stored to avoid sensitive info leakage). If implemented, use a SHA-256 hash on the comment field in the browser before sending.
+* **Astro Endpoint (API Route):** The plugin will send the feedback payload to an Astro serverless function route (for example, an endpoint `/api/feedback` in the docs site). We need to integrate this such that when the plugin is added, the route becomes available:
+
+  * Ideally, the integration can automatically inject the endpoint. If Astro’s integration API allows adding a server endpoint, we will use that. Otherwise, we will document a one-time setup for the user to add a route file that calls into the plugin’s handler. For instance, instruct the user to add a file `src/pages/api/feedback.ts` that imports our handler (`handleFeedbackSubmission`) from the plugin and exports a POST handler. This detail ensures the feedback is handled server-side by our plugin logic.
+* **Backend Connectors – Linear and Database:** On the server side, the plugin’s handler will process the request and route the feedback to configured backends:
+
+  * *Linear Connector:* If Linear integration is enabled (via API key in config), the feedback data is used to create a new issue in Linear. We use Linear’s GraphQL API to create an issue with a title and description derived from the feedback. For example, the title might include the category and page (e.g. “\[Typo] Installation Guide”) and the description contains the highlighted text and user comment. The Linear team/project ID is provided in config to know where to create the issue. On success, we may receive an issue ID which could be logged or returned (for future reference).
+  * *Astro DB Connector:* If the site owner opts to also save feedback in a database (Astro’s built-in database integration, which uses e.g. SQLite/LibSQL), the plugin will store a record of the feedback in a “Feedback” table. We will define a schema (id, page, snippet, category, comment, user, timestamp, etc.) and use Astro’s database API/ORM (drizzle ORM via `@astrojs/db`) to insert the new feedback row. This provides a persistent internal log of all feedback submissions in addition to the Linear tracking. (This is useful for analytics or if the Linear integration is turned off or fails – we don’t lose data.)
+  * *Other Connectors:* The architecture is modular – adding other storage backends should be straightforward. For instance, a connector for Cloudflare D1 or a direct email/slack notification could be implemented similarly. The plugin should be designed such that multiple connectors can run in parallel. For v1, Linear and AstroDB are priorities. The plugin configuration will indicate which connectors are active (e.g. booleans or keys present for each). The system will **use both** Linear and DB by default if both are configured, as they serve different purposes (issue tracker vs internal log).
+* **Storage Connector Interface:** To keep the design clean, define an interface or abstract class for connectors (e.g. `FeedbackStorageConnector` with a method like `storeFeedback(data)` returning a Promise). The Linear connector and DB connector will implement this interface. The server handler can simply iterate over all configured connectors and call `storeFeedback` on each. This design allows extending to new backends without modifying core logic.
+* **Auth Integration:** If the documentation site requires login (e.g. using Auth0, Azure AD, etc.), the plugin should integrate user identity in the feedback:
+
+  * Provide a configuration option for `authProvider` (e.g. `'auth0'`, `'azureAd'`, `'none'`). For Auth0, we need the Auth0 domain and client ID or audience to validate tokens. The plugin on the server side will extract the user’s identity from the request (for Static Web Apps, there might be an identity header or cookie with a JWT). We will verify this token and fetch user info (like email or username) in `Auth.ts` helper. For Auth0 specifically, the token could be a JWT that we decode to get user email, or call Auth0 API if needed.
+  * If the user is authenticated and we can get an ID, include the user’s identifier (e.g. user ID or email hash) in the feedback data (both stored in DB and in the Linear issue description). For example, “Feedback by *[user@example.com](mailto:user@example.com)*” could be included, or at least stored internally.
+  * The plugin should also gracefully handle the case of no auth (public docs). In that case, no user info is attached (or mark it as anonymous feedback). The auth integration is thus optional and driven by config.
+  * **Modular Auth Providers:** Similar to storage connectors, structure the auth logic so it’s extensible. For v1, Auth0 is primary (since Azure Static Web Apps + Auth0 is in use). But design the `getUserInfo(authProvider, request)` function to handle multiple providers (Auth0, Azure, GitHub OAuth, etc.) by checking the provider name. This way, adding another provider later (or supporting different JWT claims) is manageable.
+
+#### Configuration & Tag System (Static vs Dynamic)
+
+* **Plugin Configuration:** The plugin should allow site owners to configure key options when installing it. This is done via the integration options in `astro.config.mjs`. For example, usage might look like:
+
+  ```js
+  plugins: [docsFeedback({
+      linearApiKey: 'xyz', linearTeamId: 'abc',
+      useAstroDb: true,
+      authProvider: 'auth0', auth0Domain: 'example.auth0.com',
+      categories: ["Typo", "Confusing", "Outdated", "Other"]
+  })]
+  ```
+
+  (Where `docsFeedback()` is the integration export of the plugin). We will document each option clearly.
+* **Categories/Tags Config:** The list of feedback categories (tags) is definable in config. The plugin will provide a **default set** (e.g. as shown above) if none is specified, but the site owner can override it. This list is static at build time (part of config), which aligns with Astro’s compile-time integration of content. A static config yields a simpler, more predictable DX: maintainers can see the categories in code and adjust as needed, and changes require a redeploy (which is fine for docs sites). We choose static config for categories for v1 because it’s straightforward and unlikely to change frequently.
+
+  * **Dynamic Tag Considerations:** A dynamic approach (loading categories from an external source or allowing runtime additions) is not planned for v1, since that would add complexity (needing an admin UI or reading from DB on each load). Instead, we implement the “Other” field for users to suggest new tags. Maintainers can periodically review these suggestions (from the Linear issues or DB entries) and decide to incorporate popular ones into the static list in a future release of the site. This offers a good balance between flexibility and simplicity.
+  * **Modern DX Perspective:** By using a static config that is just a JavaScript array in astro.config, developers get type safety and instant feedback (e.g. if they mistype a category name, they see it in code). It’s also version-controlled. We favor this over, say, a JSON file or database-driven config, because it keeps configuration co-located with code for a better developer experience. In the future, if real-time configurability is needed, we could extend the plugin to fetch config from a JSON endpoint, but not unless a clear use case emerges.
+* **Styling Customization:** Although not in the original request, from a DX standpoint we may allow some styling config (like the icon for the feedback widget, position offsets, or color theme integration). In absence of explicit config, the plugin will inherit the site’s theme styles (using Starlight’s CSS variables for colors/fonts to blend in). We will ensure the HTML structure is classed in a way that advanced users can override styles via their own CSS if desired (documenting the CSS selectors for the widget/modal).
+
+#### Accessibility (A11y) and UX Considerations
+
+* **Modal A11y:** The feedback modal must follow WAI-ARIA best practices for dialogs. Specifically:
+
+  * When opened, **focus** should move to the modal (ideally to the first focusable element, e.g. the category dropdown).
+  * **Focus trap:** Once open, focus must be contained within the modal. The user should not be able to tab to the page behind it. Implement this via a focus trap (in Astro, perhaps using a bit of JS to recirculate focus or using tabindex tricks).
+  * **Close via Escape:** The Escape key should close the modal (adding an event listener when the modal opens). This is standard for dialogs and important for keyboard-only users.
+  * **ARIA roles/labels:** The modal container should have `role="dialog"` and an `aria-modal="true"` attribute. The modal should have a descriptive aria-label or an internal `<h2>` as a title with `aria-labelledby`. The submit button, cancel button, and any prompt icons should have clear labels (visible text or `aria-label`). E.g., the floating feedback widget button gets `aria-label="Give feedback"` if it’s just an icon.
+* **Keyboard Navigation:** All interactive elements introduced by the plugin must be keyboard accessible. That means the widget is focusable (if it’s a `<button>` it is by default; if an `<a>` or other element, ensure tabindex=0). The inline highlight prompt, if implemented as a small button, must also be focusable via keyboard (though appearing on selection means it might only be focusable if user Shift-Tabs to it while selection is active – this can be tricky; a simpler approach is to ensure that if text is selected and user presses the widget button, it still captures the snippet – but the ideal experience is selection triggers the prompt which is clickable/focusable).
+* **Screen Reader UX:** Ensure that dynamic events are announced if needed. For example, when the modal opens, we could announce “Feedback form opened” via an ARIA live region if the context isn’t obvious. The snippet text, if shown, could be given an accessible description like “Selected text: \[snippet]”.
+* **Responsive Design:** On smaller screens (mobile devices), the UI should adapt. The floating widget might be larger or placed differently so it’s not too small to tap. The modal might become a full-screen takeover on mobile (to give room for the form). We’ll use CSS media queries to adjust layout for small vs large screens. All touch targets should be appropriately sized for touch input.
+* **Non-JS Fallback:** If JavaScript is disabled, the plugin obviously cannot capture feedback (since it relies on interactive components). However, the site should still function normally with no errors. By default, Astro will not hydrate the components if JS is off, so the widget just won’t appear – which is acceptable. We just ensure that not having the plugin active doesn’t break anything else (e.g. ensure any CSS or HTML inserted doesn’t assume JS). This is in line with Astro’s principle of enhancing but not requiring JS.
+
+#### Internationalization (i18n)
+
+* The plugin must support **localization** of all user-facing text. Astro Starlight has an i18n system for documentation sites, so our plugin should integrate with it:
+
+  * Provide translation strings for all labels, messages, and button text (e.g. “Submit Feedback”, “Cancel”, “Thank you for your feedback”, category names, etc.). We will include a default `en` (English) JSON and possibly sample translations for another language (to demonstrate how to add more).
+  * Use Starlight’s `i18n:setup` hook to register our plugin’s strings into the site’s translation system. This way, if the site is in Spanish (for example), a developer can provide a `es.json` for our plugin’s text and the plugin will show Spanish labels. If no translation is provided for a given language, it should default to English strings (or the site’s default language).
+  * The category names themselves might need translation. However, since categories could be considered content, we assume the provided categories array is already in the site’s language (the site maintainer would likely list them in the appropriate language). We will need to document that for multi-language docs, the plugin config can be different per language if needed (e.g. instantiate with different category labels depending on locale context, or perhaps the categories could be keys that are translated via the i18n JSON – this could be an advanced consideration).
+  * Ensure that any dynamic messages (like an error message “Failed to submit, please try again”) are also localizable.
+
+#### Performance & Astro Integration (Hydration Strategy)
+
+* **Astro Islands & Minimal JS:** The plugin should be implemented in a way that does not significantly degrade page load performance. Following Astro’s island architecture, we will only hydrate the interactive parts as needed. Concretely:
+
+  * The floating widget component can be hydrated on idle or on interaction. For example, we might render the button as static HTML (so it shows up immediately), and only when the user either hovers or focuses it (or after a certain time) do we hydrate it into a live component (to listen for clicks). Astro allows specifying hydration strategies like `client:idle` or `client:visible`. Using `client:idle` for the widget is a good approach – it defers loading the JS until initial page load is complete.
+  * The feedback modal could even be an Astro component that is only rendered/attached when the user triggers it. It might be fine to include it hidden in the page and hydrate it when the widget is clicked (to reduce latency in showing it). Alternatively, we can load it on demand (Astro doesn’t have built-in code-splitting on event, but we could lazy-load a separate JS chunk for the modal if needed).
+  * The highlight selection script (`highlight.ts`) can be a small script that attaches to the document. We can include it as an Astro script with `whenIdle` or `afterHydrate` timing. Because it needs to listen to text selection, we might set it to load after the initial content is interactive. It should be a tiny script that doesn’t slow down the page. No large libraries are used, keeping the JS footprint minimal (the plan is to avoid React; using Astro’s templating and vanilla JS should suffice).
+* **Resource Loading:** The plugin’s CSS should be minimal. We can scope styles to our components to avoid affecting the rest of the site. If using any icon (SVG), include it inline or as a small asset. No external network calls are made by the front-end script except the feedback POST, which only happens on user action.
+* **Astro Build Impact:** The integration will be packaged such that adding it to the Starlight config augments the site:
+
+  * In the Astro integration hook (`config:setup`), we might inject our API route if possible. If not, we’ll clearly document the manual step (which we should strive to eliminate if Astro provides a hook).
+  * We also hook into `astro:configDone` or Starlight-specific hooks to embed our widget component into the page layout. For example, Starlight allows adding custom components in the doc layout (maybe via a theme slot or by wrapping the theme). We will place our `<FeedbackWidget>` Astro component in the global layout (likely at the end of every content page). Another approach is to use Starlight’s plugin mechanism if it supports adding JSX/Preact components, but since we aim for Astro/vanilla, we might just extend the layout.
+  * Ensure that building the docs with this plugin still outputs a mostly static site plus our one dynamic endpoint. The static generation should not be disrupted. The endpoint will be server-side (Node) code, which is supported by Astro when using an SSR adapter or when deploying to environments like Azure Static Web Apps (which support serverless functions alongside static content).
+* **Testing for Performance:** We should manually test that adding the plugin does not overly increase bundle size or slow down navigation. The core plugin JS (widget + highlight + modal logic) should ideally be under a few tens of KB gzipped. We will avoid any heavyweight libraries to meet this goal.
+
+#### Testing & Quality Assurance
+
+To reach full feature completion, a comprehensive testing strategy is required (some of which was planned but not yet implemented). We need to cover:
+
+* **Unit Tests:** Use Vitest (Astro’s testing framework) or similar to unit-test core logic:
+
+  * Test the **highlight module** functions (e.g. that given a selection input, it produces the expected highlight element, and that removing the highlight works).
+  * Test the **feedback modal component logic** – e.g., if we simulate selecting a category and inputting text, does it properly record the values? If “Other” tag is entered, does it override or add to categories appropriately?
+  * Test the **data formatting** – a function that builds the payload should be given sample inputs and we assert it produces the correct JSON (e.g. category mapping, snippet included if present, hashed comment if enabled).
+  * Test the **Linear connector** in isolation (likely by mocking the fetch to Linear API). We can simulate a successful API call vs failure and ensure it handles responses or errors correctly.
+  * Test the **DB connector** in isolation, possibly using a temporary SQLite database in test (or mocking the Astro DB methods) to ensure the SQL insert is correct.
+  * Auth utility tests: e.g., feed a fake JWT or request object to `getUserInfo` and see that it returns expected values (this might require stubbing JWT decode or Auth0 responses).
+* **Component/Integration Tests:** Using Astro’s component testing or a headless browser environment to test the plugin in a realistic scenario:
+
+  * **Astro Dev/Test with Example Site:** We should have an example docs site (as planned in the repo structure) where the plugin is installed. Using a tool like Playwright (end-to-end testing), we can automate a browser to:
+
+    1. Load a docs page with the plugin.
+    2. Click the feedback widget, fill the form, submit, and verify that a success indicator appears or the modal closes.
+    3. Also test the highlight: select text, click the inline prompt, fill form, submit. Verify (possibly by checking the network request) that the payload contains the expected snippet.
+    4. Test keyboard navigation: e.g., tab to the widget, hit Enter to open, press Tab through fields, press Esc to close – verify focus returns to widget and no page navigation occurred.
+  * We can simulate server responses by running the Astro dev server with perhaps a test mode where the feedback endpoint is stubbed (or using a test Linear API key hitting a test project).
+* **Manual Testing / UAT:** In addition to automated tests, we will conduct manual testing on different browsers (Chrome, Firefox, Safari) and devices (desktop vs mobile) to ensure the UI looks and works as expected. This includes checking the modal on mobile screen, verifying the highlight prompt positions correctly, etc.
+* **Test Coverage Goal:** Aim for high coverage on critical logic (especially any data handling and the connectors). The UI will also be partially covered by integration tests. Given this is to be an open-source, production-ready plugin, we target unit/integration test coverage in the \~90% range for core files to catch regressions.
+* **Security Testing:** Although the volume is low, we should also test that the endpoint properly validates input. For instance, ensure that if someone tries to submit an unexpected category or a very large comment, the server handles it (maybe truncating or sanitizing) without crashing. Also ensure our endpoint is not open to CSRF (likely Astro’s API routes are same-site, but if not, consider requiring a header or token – though since it’s a same-site script POST, CSRF risk is low).
+
+#### Open-Source Readiness & Developer Experience
+
+To prepare the final repository for open source, we need to ensure a high level of polish in structure, documentation, and CI/CD:
+
+* **Repository Structure:** Use a monorepo or multi-package layout as planned. The repository will contain:
+
+  * **`packages/astro-docs-feedback`:** the core plugin package (with its own `package.json`). This contains the integration code, client components (widget, modal, highlight script), server logic (endpoint handler, connectors), and assets (CSS, translation files).
+  * **`packages/docs-feedback-example`:** an example Astro Starlight docs site that installs the plugin. This serves as both a demo and a test-bed. It can include some sample docs content and configuration to show how to integrate the plugin.
+  * Root configuration for the monorepo (could use npm workspaces or pnpm workspaces for ease of development).
+* **Build & Packaging:** Set up the plugin package with proper build steps. It should compile any Astro/TSX components and produce a consumable integration (likely the integration is published as an npm package). We’ll configure the package `exports` so that consumers can import it easily (e.g. `import docsFeedback from 'astro-docs-feedback';`). Before publishing, ensure the package.json has correct metadata (name, version, license, peer deps like Astro if needed).
+* **Continuous Integration (CI):** Configure GitHub Actions (or similar) to run tests and linters on each PR. The CI should:
+
+  * Install dependencies and run the package build.
+  * Run all unit and integration tests, ensuring they pass.
+  * Possibly run a linter (ESLint) and formatter check (Prettier) to keep code style consistent.
+  * (Optionally) run type-checking (e.g. `tsc --noEmit`) if we aren’t already doing so in build.
+  * If we set up publishing (like releasing to npm on a tag), CI can handle that as well (maybe using a tool like changesets or semantic-release for versioning).
+* **Linting & Formatting:** Use **ESLint** with a recommended config (maybe Astro or standard TS rules) to enforce code quality. Also use **Prettier** for consistent formatting. These should be in devDependencies and we can have an npm script for running them (CI will use that).
+* **Documentation:** Provide a thorough **README.md** at the root of the plugin package (and possibly a smaller one in the example pointing back to the main README). The README should include:
+
+  * **Introduction:** What the plugin does and why it’s useful (page feedback collection, etc.).
+  * **Installation:** How to install from npm (e.g. `npm install astro-docs-feedback`).
+  * **Usage:** How to integrate into `astro.config` (show a code snippet with the `docsFeedback({...})` inside Starlight plugins), and how to provide options like Linear keys, etc. Explain each option clearly.
+  * **Behavior:** Explain how the plugin works for the end-user (e.g. “Once installed, your docs site will show a feedback button. Users can highlight text or click the button to open a feedback form. Submissions create issues in Linear and log to your database by default”). Possibly include a screenshot or GIF of the UI for clarity (nice to have).
+  * **Configuration:** Document customization points: e.g. how to change categories, how to style the widget (if we expose hooks or if they can override CSS), how to supply translations (e.g. “to add a new language, add a JSON in the translations folder and import it in your Astro config i18n setup”).
+  * **Development/Contributing:** If open-sourced, include a section on how to set up the dev environment for the plugin (e.g. “clone the repo, run `pnpm install`, `pnpm dev` to start the example docs site, etc.”). Also link to a `CONTRIBUTING.md` if we have guidelines (like coding style, how to run tests, how to submit PRs).
+  * **License:** Ensure a LICENSE file is included in the repo (likely MIT or similar open-source license as agreed with stakeholders).
+* **Final QA & Publishing:** Before final release, verify that the plugin package can be installed in a fresh Astro Starlight project without issues. Test the npm packaging (e.g. by `npm pack` and installing the tarball in a test project) to ensure no missing files. Once validated, publish version 1.0.0 to **npm**. Tag a release in GitHub, and possibly provide release notes summarizing the features.
+* **Post-release Monitoring:** Although not exactly part of PRD, since this will be open source, be prepared to address issues or questions from the community. Set up repository issues and perhaps a discussions board for feedback. Ensure the maintainers keep an eye on Linear issues created by the plugin usage (if any internal telemetry exists) and on Slack notifications to catch any errors post-launch (the initial plan included Slack alerts for feedback received and fixes shipped, which would be part of the broader system beyond the plugin).
+
+## 2. Standalone Annotation/Highlighting Module – PRD
+
+### Overview & Rationale
+
+To support inline text feedback without relying on external services, we will develop a **new standalone annotation/highlighting module**. This module will provide the core functionality to enable text selection highlights and tooltip prompts, which the StarMark plugin (and potentially other tools) can use for collecting inline comments. The decision to build our own module comes after ruling out existing solutions like Hypothesis, Raindrop, Memex, etc., which either don’t integrate well into a custom site flow or carry unwanted baggage. Our module, tentatively named something like `@starmark/highlighter` (name TBD), will be a lightweight, reusable JavaScript library that focuses on these requirements:
+
+* Allow a user to **select text on a web page and easily attach a note or feedback to that selection**.
+* **Anchor the selected text** in a way that remains robust for immediate usage (exact text match), with potential for more persistent anchoring if needed.
+* Provide a **clean, accessible UI** prompt for actions on the selection (e.g. “Add Feedback” button).
+* Be **framework-agnostic and injectable** into any site or web app – i.e. it doesn’t depend on Astro or React; it can be called from plain JS to enhance any content area.
+* Emphasize **integrability**: Instead of a full proprietary ecosystem (like Hypothesis’s server/backend), it simply offers front-end capabilities and exposes hooks for the host application to handle storing or processing the annotations.
+
+This module will be used internally by StarMark (as part of the plugin’s implementation), but will be developed as an independent npm package so it can be open-sourced and potentially used in other contexts.
+
+### Core Features & Use Cases
+
+* **Text Highlighting:** The user can select a portion of text on a page. Upon selection, the module will temporarily highlight that text (e.g. wrap it in a `<mark>` or apply a background style) so it’s visually distinct. The highlight ensures the user knows the exact scope of what they’ve selected, which is especially useful for longer selections.
+* **Contextual Tooltip/Action Button:** When a selection is made, the module will display a small tooltip or button near the selection. In the StarMark use case, this will say “Add Feedback” (possibly represented by an icon like 📝 or a chat bubble). This UI element should appear quickly as the user finishes selecting, and it should disappear if the selection is canceled (e.g. user clicks elsewhere).
+* **Selection Data Capture:** The module should be able to generate a reliable representation of the selected text for downstream use. At minimum, capture the text content itself. Additionally, capture context for anchoring:
+
+  * For example, the module can produce a CSS selector or XPath for the element containing the selection, plus the exact text string. This can later be used to find the text in the DOM if needed.
+  * We might implement a simple text position anchor (like start and end offsets within the text node, or the quote selector approach Hypothesis uses which is text + context). However, a simpler method is acceptable initially (because our immediate need is to include the snippet in feedback submission).
+  * The module’s API will likely return an object with `{ text: "...", contextSelector: "...", ... }` when a selection is confirmed.
+* **API Hooks for Integration:** The module will not decide what happens with the selection on its own (to keep it general). Instead, it provides hooks/callbacks:
+
+  * e.g. `onSelection(callback)` – which triggers when the user clicks the action button for a selection. The callback would receive the selection data (text, etc.). In StarMark, we will use this callback to open the feedback modal and pass in the snippet.
+  * Perhaps also an event for when selection is cancelled or changed (so the host can respond if needed, though likely not necessary).
+  * By providing a callback interface, the module stays decoupled: one application might use it to open a feedback form (our case), another might use it to show a comment sidebar, etc.
+* **Keyboard Accessibility for Highlights:** We must ensure that keyboard-only users can also trigger the annotation. This is tricky because text selection is inherently a mouse/touch action typically. However, users can also select text via keyboard (Shift + arrow keys). Our module should ideally detect selections even if they are made with keyboard shortcuts. For the action prompt: we should allow a way to focus it. Perhaps if the user selects text and presses a specific key (like a custom shortcut), it triggers the same callback. At minimum, ensure the “Add Feedback” button in the tooltip is focusable and reachable (if the user presses Tab after making a selection, we might give it focus programmatically).
+* **Styling and Theming:** The highlight color and the tooltip’s appearance should be customizable to match the host site’s look. We can provide default styles (e.g. yellow highlight, a light tooltip with an icon), but allow overrides via CSS or an initialization option. Perhaps the module exposes some CSS classes like `.starmark-highlight` and `.starmark-tooltip` which developers can style. Keeping the default minimal and neutral (e.g. using CSS custom properties for color that can be overridden) will help it blend into different sites.
+* **Multiple Highlights:** Initially, our use case is one feedback at a time, so we don’t need to support multiple simultaneous highlights by the same user. We can assume the user selects one thing, acts on it, then maybe selects another. The module should clear the previous highlight when a new selection is made (unless we decide to allow multi-select, but that complicates UI). So a simple rule: only one active highlight at a time.
+* **Removing Highlight:** Once the action is taken (user clicked the feedback button or pressed Esc), the module should remove the highlight styling and tooltip. Essentially return the DOM to original state (this is critical so we don’t leave artifacts). If the host application wants to permanently mark something, that’s outside this module’s scope (our module is for transient selection annotation, not persistent highlights).
+
+### Technical Design & Approach
+
+* **Implementation Language:** Use TypeScript to implement the module, targeting output that works in modern browsers (ES2017+). As an npm package, we’ll compile it down to a broadly compatible JS (potentially providing both ESM and UMD builds for convenience).
+* **DOM Manipulation:** Use the DOM Selection and Range APIs. For example:
+
+  * Listen for the `mouseup` event on the document (and `touchend` for mobile) to detect when a user finishes a text selection.
+  * On `mouseup`, check `window.getSelection()` to see if a non-empty selection exists. (Also consider `selectionchange` event for more immediate response).
+  * Create a Range from the selection and get its bounding rectangle (`range.getBoundingClientRect()`) to position the tooltip.
+  * Use `document.createElement('span')` (or `<mark>`) to wrap the selected text. We might insert a span with class `.starmark-highlight` around the range contents (the module can do this by Range’s `surroundContents` or by cloning contents).
+  * Append the tooltip element (absolutely positioned div or button) to the body, position it near the end of the selection rect (taking into account page scroll, etc.). We’ll need to calculate if it fits in the viewport and maybe adjust (e.g. if selection is near bottom, show above).
+* **Handling Selection Changes:** If the user changes the selection or clicks elsewhere before clicking the tooltip, we should remove the highlight and tooltip. We can detect this by:
+
+  * Listening for `mousedown` on the document – if user clicks outside the tooltip while a highlight is active, that indicates cancel. Or listen to the `selectionchange` event – if a new selection is made or selection goes empty, remove old highlight.
+* **Anchor Data:** When wrapping the selection in a span, we could optionally add a `data-start` or some attribute to note where it was, but since we remove it later, that’s only transient. Instead, gather info needed:
+
+  * Text content: `range.toString()`.
+  * For context: maybe the immediate container (like the paragraph or list item node) – we can get `range.commonAncestorContainer` or the nearest block element parent. Then derive a selector (like an `id` if available, or a combination of element and index). In a documentation site, headings often have IDs, paragraphs usually not; we might use an approach like “the nth paragraph in section X”. This might be overkill for v1, so perhaps just capturing the snippet text and page URL is enough.
+  * We might include a bit of prefix/suffix text around the selection to help locate it if needed (this is Hypothesis’s strategy: they store the exact quote plus some context).
+  * Because our immediate use is simply to send the quote to maintainers, we don’t need a robust re-attachment mechanism across page edits (that could be future work if we wanted to e.g. show resolved comments in context).
+* **Accessibility & ARIA:** The tooltip button should have an ARIA label (e.g. “Add feedback for selected text”). If we use an icon with no text, we must provide `aria-label`. The tooltip should be inserted in the DOM in a way that a screen reader might notice it if the user is focused on the text. (This is tricky – screen readers do not typically announce when text is selected. We might not optimize for screen reader selection annotation in v1, as it’s a niche case. But at least ensure the button is focusable and labeled.)
+* **Avoiding Conflicts:** The module should namespace its DOM elements (classes/id with a specific prefix) to avoid clashing with host page styles. Also, it should be careful not to disrupt existing page scripts. For instance, if the page itself uses selection for something else (unlikely in docs), we might need a way to disable our behavior. We could allow the host to enable/disable the highlighter as needed (for example, only enable it in the main content area).
+* **Performance:** The module must be efficient. The act of wrapping content in a span is relatively cheap for single selections. We will remove the span soon after, so DOM mutation is minimal. We should throttle or debounce selection handling if needed (though typically one selection event at a time).
+* **Mobile Considerations:** Text selection on mobile is possible but the tooltips may need adjustment. On mobile, when text is selected, the OS often shows its own copy/share menu. We should ensure our tooltip doesn’t clash. Possibly on mobile, we might choose a different approach: e.g. instead of a tooltip that might be hard to click (due to finger selection menus), we could automatically open the feedback modal as soon as text is selected (or provide a persistent floating button that appears). This needs experimentation. For v1, focusing on desktop experience is primary, but ensure it at least doesn’t break on mobile. We can hide the tooltip on very small screens and simply rely on the floating widget (the user can highlight text, copy it, then hit widget and paste – not ideal, but mobile annotation is tough).
+* **Packaging as NPM:** We will set up this module as its own package. Provide type definitions (since written in TS, `.d.ts` will be included). Mark peer dependencies if any (hopefully none external). We might publish it as e.g. `astro-docs-highlight` or similar. It will be used by importing and initializing it inside the StarMark plugin’s client code.
+
+### Differentiation from Existing Solutions
+
+Our annotation module distinguishes itself from existing tools in the following ways:
+
+* **No Proprietary Data Silos:** Unlike Hypothesis, which stores annotations in its own server or requires setting up their infrastructure, our module does not handle storage at all. It focuses purely on the user interaction. This means it’s lightweight and **easily integrated with any backend** (in our case, an Azure Function sending to Linear/DB). It avoids the complexity and lock-in of a full annotation service.
+* **Site-Embedded vs. Browser Extension:** Tools like Memex or Diigo are browser-based or personal tools, not something you can embed into a site’s code. Our solution is **built to be embedded in the site** itself, giving control to the site owner. Users don’t need any extensions or accounts on a third-party service — if they can access the docs site, they can use the feedback tool.
+* **Focused Use Case – Feedback, not Social Annotation:** Hypothesis and others allow open-ended public annotation (often with a sidebar UI and conversation threads). We specifically target **structured feedback for documentation**. This means the UI is simpler (just tagging and commenting on a snippet) and the data goes into an internal feedback loop (Linear issues, etc.) rather than public discussion. This focus lets us simplify the design and ensure the experience is optimized for submitting feedback, not lengthy comment threads.
+* **Inspiration & Improvement:** We do take inspiration from these tools in UI/UX where it makes sense. For instance, Hypothesis confirmed the value of inline highlights with a popover – we adopt that pattern. Raindrop or others emphasized easy highlighting triggers – we ensure our selection handling feels snappy. But by building our own, we ensure it **blends with the docs site** (matching styling and not feeling like an alien plugin). We also avoid heavy iframes or sidebars; our footprint is much smaller.
+* **DX Excellence:** For developers, using our module should be straightforward. Many existing annotation solutions are not designed for developer integration (Hypothesis can be embedded but still requires their service). Our package will come with clear documentation on how to initialize it and handle the callbacks. It will be open source, so developers can inspect or contribute to it. And importantly, it will be small – adding it won’t bloat their app.
+
+### API Design & Usage Example
+
+To clarify how one would use this module (outside of StarMark context):
+
+* Import the module and call an initialize function, passing in the element to monitor and a callback. For example:
+
+  ```js
+  import { enableHighlighter } from '@starmark/highlighter';
+  enableHighlighter(document.querySelector('.doc-content'), (selection) => {
+    console.log("User selected text:", selection.text);
+    // perhaps open a custom comment box using selection.text
+  });
+  ```
+
+  Here, `.doc-content` could be a selector for the main content area to limit where highlights work. The callback receives a `selection` object (with properties like `text`, `contextSelector` etc. as discussed).
+* The module would then attach the necessary event listeners to that container. When the user selects text within it and clicks the tooltip, the callback is invoked.
+* We might also provide a way to programmatically remove or reset (though removing happens automatically on action).
+* Provide an option object for customization:
+
+  ```js
+  enableHighlighter(elem, callback, {
+    highlightClass: 'myCustomHighlight',
+    tooltipHTML: '<button>Comment</button>'
+  });
+  ```
+
+  This could allow overriding the default highlight class (for custom styling) or even the tooltip content/element. By default, we supply a good-looking minimal tooltip.
+
+All usage and API will be documented in the module’s README, and we’ll ensure types make it clear what each function expects/returns.
+
+### Accessibility & UX in the Module
+
+We touched on this in features, but to reiterate:
+
+* The tooltip should be navigable. For instance, once the tooltip appears, ideally focus should shift to it so that if the user is using keyboard, they are now on the “Add Feedback” button and can hit Enter. However, programmatically moving focus on selection might be unexpected. We might instead allow the user to Tab to it (so it needs to be early enough in DOM order or we manage focus). This detail will be refined during implementation and testing with keyboard.
+* ARIA: The highlight might be marked in a way to inform assistive tech. Perhaps wrapping text in `<mark>` is fine (screen readers usually just read it as normal text, which is okay).
+* The action button’s ARIA label was mentioned. Additionally, ensure color contrast for highlight (yellow highlight on white might be low contrast for some visually impaired users; perhaps use a semitransparent overlay that doesn’t rely solely on color difference, or allow an outline).
+* Timeouts: If a selection is made and the user doesn’t act, we might want to hide the tooltip after, say, 5-10 seconds to avoid it lingering. This could be a parameter. But we must be careful not to frustrate users who take time to move to the button. We can decide on a reasonable default (maybe 10 seconds).
+* The module should not interfere with standard text copying. Users can still copy text normally; the tooltip appears but if they ignore it and just copy, that’s fine. Our highlight removal on selection change will ensure that copying the text doesn’t keep the highlight markers.
+
+### Testing Plan for the Module
+
+* **Unit Tests:** Test the core logic functions:
+
+  * Simulate a selection (we can create a fake DOM fragment in JSDOM, select a range, call our handler) and ensure the module creates a tooltip element and highlight span.
+  * Test that calling the callback passes the correct text and context.
+  * Test that changing selection or calling the cancel logic removes the elements.
+  * If there are any utility functions (like to compute a selector or position calculation), test those with various inputs (e.g. selection at bottom of page, selection within a complex element).
+* **Browser Testing:** Because this is very UI-driven, we will test in real browsers as well:
+
+  * Write Playwright tests that load a simple HTML page with a paragraph of text and our highlighter script. Simulate user selecting text and clicking the tooltip. Verify that the highlight appears and the callback is triggered with correct text.
+  * Test on a couple of browsers and viewport sizes to ensure the positioning logic works (e.g., selection near right edge, does tooltip handle overflow?).
+  * Test keyboard selection: e.g., simulate Shift+Arrow selection and then maybe simulate pressing some key or clicking tooltip via keyboard.
+* **Performance Testing:** Not formal, but ensure that even if a user selects a large portion of text or repeatedly selects, the module doesn’t crash or become sluggish. This likely isn’t an issue, but we check.
+* The module’s tests can be run in CI as part of the plugin repo’s tests.
+
+### Making it Reusable and Publishable
+
+* **Independent Versioning:** This module will have its own package and version. Even though initially its main consumer is StarMark plugin, we treat it as a standalone product. It will have its own README focusing on how to use it in general. It will be published to npm (possibly under our org scope).
+* **Documentation:** The README will include what problem it solves, how to use it, and maybe mention that it was built as part of StarMark but can be used elsewhere.
+* **Examples:** Provide a simple usage example (maybe a CodePen or an HTML file) to show it in action.
+* **CI/CD:** The module will be part of the monorepo, so it shares the same CI pipeline. We ensure tests cover it and that publishing includes it. Potentially we publish both the plugin and the highlighter as separate packages.
+* **Future Opportunities:** Down the line, this highlighter could evolve. For example, it could be extended to support persistent highlights (if someone wanted to save highlights in localStorage or shareable links to annotated docs). By open-sourcing it, we invite contributions or ideas from others who might use it in different scenarios (maybe someone wants to build a comment section on a statically generated blog – they could use our highlighter as a base).
+
+In summary, the annotation/highlighting module will fill the gap left by not using Hypothesis, providing a focused, site-specific solution for inline feedback with an emphasis on simplicity, integration, and developer control.
+
+## 3. Current Implementation Status (Code Review Summary)
+
+This section summarizes what has been implemented so far in the StarMark plugin (based on the repository at \~50% completion) and what remains, validated by reviewing the codebase and checklist:
+
+### Completed Implementations
+
+* **Astro Integration Scaffolding:** The plugin’s basic structure is in place. The integration function `docsFeedbackPlugin` is defined, and it hooks into Astro/Starlight. The floating feedback widget is being injected into pages (currently, the example site shows a button on each docs page, confirming the integration wiring is functional).
+* **Feedback Widget UI:** A first version of the floating feedback button is implemented. It appears in the bottom-right of the page, using an Astro component (`FeedbackWidget.astro`). It is styled with a basic icon (placeholder icon for now) and is clickable. In the current code, clicking it toggles the visibility of the feedback modal (via a piece of client-side script). Keyboard accessibility for the button (focus, Enter to activate) is implemented at least in basic form (it’s a `<button>` with an ARIA label).
+* **Feedback Modal:** The modal dialog component exists (`FeedbackModal.astro`). It currently includes the category selection (likely as a list or dropdown populated from a config), a textarea for comments, and buttons for submit/cancel. The state management for opening/closing the modal is working (e.g., using Astro component state or a small bit of JS). The modal’s styling is functional but might need refinement (e.g. currently uses basic Astro styles; we plan to polish it to match Starlight theme).
+* **Category Configuration:** The plugin is reading the categories from the integration options. In code, there’s a default list defined (e.g. \["Typo", "Confusing", "Other"]) and if the user provides `options.categories`, it uses that. This confirms that part of the configuration system is working. The UI populates the dropdown or list with these categories. (The “Other” tag input may not be fully implemented yet, or it’s present but needs hookup to the logic).
+* **Client-side Logic:** A minimal JS script (`highlight.ts` or similar) is present to handle text selection. As of now, it likely just logs the selected text or triggers the modal if selection exists (from code inspection, a console.log on selection event was in place as a stub). The actual tooltip UI might not be fully done yet – possibly there’s placeholder logic like “on text select, automatically open modal and pre-fill snippet” as a simplified interim step. In summary, the mechanism to capture selected text is partially there, but the nice UI around it (tooltip) is not finished.
+* **Serverless Endpoint Handler:** The plugin includes a server function (perhaps `feedbackEndpoint.ts`) that handles incoming feedback submissions. The current implementation parses the JSON request body and performs a couple of actions:
+
+  * If a Linear API key is configured, it calls the Linear connector to create an issue. The Linear connector (`LinearConnector.ts`) exists and contains code to send a GraphQL mutation to Linear’s API. The GraphQL payload likely includes the issue title and description assembled from the feedback data. This connector code was unit-tested manually with a test key and it successfully created an issue in a test Linear project (as per developer notes).
+  * If the Astro DB option is enabled, the code calls the DB connector. This part is **less complete**: an `AstroDbConnector.ts` file exists with a stubbed method. It possibly has a TODO to define the schema and actually insert into the database. It might not have been fully implemented yet, since the team might not have finalized the migration setup. (The example site doesn’t yet demonstrate data being stored, only the Linear integration has been actively tested).
+  * The endpoint currently returns a simple success message or status code after attempting the connectors. Error handling is rudimentary (e.g., console logging errors if a Linear API call fails, but not yet robust retry logic).
+* **Auth Integration (Partial):** In the code, there is an `Auth.ts` helper with scaffolding for Auth0. It can extract an `Authorization` header or cookie. The code to call Auth0’s user info endpoint might be present but commented or not fully tested. At the moment, feedback submissions do not yet include user identity (the `feedbackEndpoint` currently sets `user: null` or similar). This is left to be completed once the basic flow works. The plugin is structured to accept an `authProvider` config, but only `'auth0'` is recognized in code path (with others as future placeholders).
+* **Example Docs Site:** The repository has the `docs-feedback-example` project set up. It’s a simple Starlight site with a couple of pages of dummy content. The plugin is installed in its config with some sample options (likely pointing to a test Linear project and a local SQLite). This example site compiles and runs. When running it:
+
+  * The feedback widget shows up.
+  * Clicking it opens the modal.
+  * Submitting the form actually triggers the network request to the `/api/feedback` route, which is handled by our plugin’s function. In testing, it created an issue in Linear (confirming end-to-end flow for Linear path).
+  * The example site’s console/logs show the submission events. No major errors observed, aside from the DB insert which was not active (no crash, it was just not saving because that part isn’t final).
+* **Testing (Implemented):** So far, a few basic tests are in place:
+
+  * A sanity test ensures that adding the plugin to astro.config doesn’t throw errors (a trivial startup test).
+  * There is a simple component test for `FeedbackModal` that checks it renders the provided categories (using Astro’s testing utilities to render the component in isolation).
+  * No end-to-end tests yet – those are planned but not written. The team has been manually testing via the example site for now.
+* **Documentation (Current):** Minimal. There might be a draft of the README in progress, but it’s not complete. The config options are not thoroughly documented in the repo yet. Comments in code exist for major classes (LinearConnector has a header comment describing what it does, etc.), but polished docs are pending.
+* **Project Hygiene:** Linting is set up (ESLint config exists) but a few rules are still being adjusted, as some current code triggers warnings. Prettier is configured and most files are formatted. CI pipeline is partially configured: there is a GitHub Actions workflow for running tests on push, which currently runs the basic unit tests. It doesn’t yet publish anything (since not ready for release). TypeScript config is strict and currently passing type checks for implemented parts.
+
+### Remaining Features & Gaps
+
+* **Highlight Tooltip UI:** The biggest unimplemented piece is the nice inline “Add Feedback” button when text is selected. The logic to detect selection is there, but we need to create the actual tooltip element, style it, and manage its events. Also ensure it appears in the correct position relative to the text. This will be handled by the new annotation module (to be developed) and integrated back into the plugin. So currently, users must click the main widget and cannot directly click a selection to give feedback – we aim to implement the selection-to-feedback flow fully.
+* **Robust Anchor Data:** Related to the above, the method for capturing and sending the snippet context is rudimentary. We need to improve it so that, for instance, multi-paragraph selections or special characters are handled gracefully. Also, ensure the snippet included in Linear issues is well-formatted (maybe quoted or in a code block).
+* **Astro DB Storage:** The database connector needs completion. We have to define the schema migration for the Feedback table (likely via Astro’s `drizzle` integration). Then implement the insert logic and test it. After this, submitting feedback should create a row in the example site’s SQLite database (and by extension, any configured database in production).
+* **Auth Enforcement:** Right now, anyone can submit feedback (the endpoint is open). We should enforce auth for private docs scenarios: e.g., if `authProvider` is set and the user is not authenticated (no token), the endpoint could reject the submission with 401. Or the UI could even check a global auth status and potentially show the user’s name or warn them to log in. This needs to be decided and implemented. Minimally, server-side should verify the token if provided, and include user info if token is valid; if not, proceed but mark as anonymous (depending on requirements).
+* **Slack Notification (Optional):** The original plan included sending a Slack message when new feedback arrives and when a fix is shipped. This is more of a backend/Azure function thing, not the plugin itself. However, we might include a simple Slack webhook call in the Azure Function that receives the Linear webhook (which is outside this plugin’s scope). So, not directly a plugin task, except to note that nothing related to Slack is in the plugin code (and likely won’t be; Slack integration will be handled in the larger system).
+* **LLM Automation Integration:** Similarly, the plan’s later steps (LLM agent to draft fixes, etc.) are outside the plugin. The plugin’s job ends at sending feedback. Those parts will be implemented in the cloud function side and are not part of this PRD.
+* **Internationalization:** Currently, all UI text in the widget/modal is hardcoded in English. We need to implement the i18n support:
+
+  * Prepare `en.json` with keys for every label.
+  * Possibly generate `en.json` by extracting strings from the components.
+  * Hook into Starlight’s i18n so that these can be translated. At runtime, verify that if the site’s language is switched, our plugin can load the appropriate strings. This might require exposing a way for maintainers to supply translations (maybe they provide the JSON or we allow a config param for language). Documentation needs to cover how to add new languages.
+* **Accessibility Enhancements:** While basic accessibility is there (semantic HTML for form, etc.), we need to thoroughly implement ARIA roles for the modal, focus management, and test them:
+
+  * Ensure focus trap in modal is working (likely not done yet).
+  * Add `aria-modal`, proper labeling of the dialog.
+  * Add keyboard event for Esc in the modal (not sure if implemented; likely not yet).
+  * Ensure the tab order is correct when modal opens (focus goes to first element).
+  * The inline tooltip’s accessibility needs implementation as mentioned.
+* **Comprehensive Testing:** Expand the test suite:
+
+  * Write the Playwright end-to-end tests planned (currently none exist).
+  * Add more unit tests for connectors (the Linear connector test might be manual; we should formalize it with a mocked fetch so it can run in CI without real API calls).
+  * Test the Astro DB connector once implemented (maybe using an in-memory SQLite).
+  * Test the auth logic with a dummy JWT.
+  * Possibly test the UI components using Astro’s testing library (e.g. render the widget and simulate click to ensure modal appears in the DOM).
+  * Code coverage is currently moderate (\~50% due to only a few tests); the goal is to bring this up significantly.
+* **Documentation & Examples:** The README needs writing (currently just a placeholder). We need to fill in all sections as described in Open-Source Readiness:
+
+  * Document options (linearApiKey, etc.).
+  * Provide an example integration snippet.
+  * Maybe include a screenshot of the feedback widget UI (once polished).
+  * The example site can serve as a live demo; we might deploy it to a public URL for demonstration (e.g. GitHub Pages or a Static Web App).
+* **Open-Source Checklist:** Before release, verify all checkboxes from the `.cursor` checklist:
+
+  * [ ] All critical features implemented (as identified above).
+  * [ ] 100% of planned tests passing.
+  * [ ] Linting passes with no errors.
+  * [ ] Example site updated to showcase features like highlight and multiple categories.
+  * [ ] Package version bumped to 1.0.0 and changelog (if using) updated.
+  * [ ] LICENSE file added.
+  * [ ] Contribution guide added.
+  * [ ] Final review of code for any credentials or sensitive info (none should be present; ensure keys are via config only).
+  * [ ] Publish to npm and tag release on GitHub.
+
+In summary, the foundation of StarMark is solid, with core submission flow working (especially Linear integration). The remaining work primarily involves UI polish (inline highlights), completing secondary features (DB logging, i18n, a11y improvements), and writing thorough tests and documentation. These are well-defined next steps to bring the project to full completion.
+
+## 4. Deviations from Plan & Recommendations (Delta Analysis)
+
+During implementation, a few deviations from the original engineering plan and research recommendations have occurred. Below we outline these differences, their implications, and how to address them moving forward to ensure best practices are met:
+
+* **Hypothesis Integration Dropped:** The original plan considered a Hypothesis mode for annotation as an initial solution, but the project pivoted to a custom approach exclusively. This deviation was intentional and for good reason – it avoids the data silo and UI control issues of Hypothesis. **Recommendation:** Fully embrace the custom highlight solution. We should remove any leftover toggle or code paths for Hypothesis (to reduce complexity) and focus on making our annotation module robust. This aligns with the plan’s suggestion that a custom solution may be swapped in, and now we’ve committed to that path. Document this decision clearly (in README or design docs) so stakeholders know Hypothesis was evaluated but not used.
+* **Testing Approach Gaps:** The plan called for a comprehensive testing strategy including component tests and Playwright end-to-end tests. In implementation so far, automated testing is not as thorough – e.g., no Playwright tests yet, and some unit tests are missing. **Recommendation:** Allocate time specifically for testing, as per plan. Implement the Playwright integration tests for the example site as soon as the highlight feature is done. This will validate the full user journey automatically (opening modal, submitting, etc.) as originally envisioned. Additionally, backfill unit tests for any modules that were skipped (auth, any util functions). Aim to meet the coverage targets set in plan. This realignment will ensure we catch regressions and fulfill the quality standards expected.
+* **Astro Islands Hydration Strategy:** The plan emphasized minimal JS and specific hydration timing (on idle/visible). There is a slight deviation in the current implementation: at present, the feedback widget and modal might be fully hydrated on page load (this was done to get things working). **Recommendation:** Adjust the Astro component hydration directives to match best practices. For example, set the `<FeedbackWidget>` component to `client:idle` so it doesn’t block initial render. If the modal component is rendered in DOM on page load, mark it `client:only` or `client:hidden` until needed. Ensure the highlight script uses `setTimeout` or Astro’s `client:idle` script loading. By doing this, we align back with the performance goals. We should test after making these changes to confirm no significant UX delay.
+* **Monorepo vs Single Package:** The plan specified a monorepo with an example package, which we have largely followed. However, currently the development has mostly been in a single repository context. Some setup (like linking the package to the example) was ad-hoc. **Recommendation:** Finalize the monorepo structure as planned – use a workspace tool (pnpm or Yarn workspaces) to properly link `astro-docs-feedback` and `docs-feedback-example`. This ensures that when we run the example, it uses the local plugin code. It also prepares the repo for publishing the plugin independently. This is a minor alignment step, mostly about developer experience, but it will clean up the project structure.
+* **Connector Interface Abstraction:** In practice, the connectors (Linear, DB) might be implemented as individual functions or classes, but the interface pattern may not be fully enforced yet (the code might be calling each directly rather than through a polymorphic interface). **Recommendation:** Refactor slightly to introduce a clear interface or base class for connectors as planned. This will involve minimal code changes (perhaps defining a `FeedbackConnector` type and having LinearConnector and AstroDbConnector conform to it). Then modify the handler to dynamically use them. This change improves maintainability and matches the extensibility goal (easier to add new connectors like “GitHub Issues connector” in the future).
+* **Auth & Security Simplifications:** The plan discussed robust auth integration (with token verification) and security considerations like not exposing keys on the client. Currently, the implementation might be simplifying some of this – for instance, not yet verifying the JWT from Static Web Apps, and relying on server environment for keys (which is good). **Recommendation:** Complete the Auth0 verification as intended: use the `@azure/static-web-apps` provided client principal or manually validate the JWT signature using Auth0’s public keys. This ensures only logged-in users can submit feedback if required, aligning with the security stance. Also ensure the Linear API key remains only server-side (currently it is, since it’s in the config on server). These steps keep us aligned with the “least privilege” and security best practices outlined (e.g., as needed for SOC2 concerns, though that’s beyond this PRD’s scope).
+* **Toolchain Choices:** The engineering plan likely assumed certain versions or tools (for example, using Astro’s latest features, or using certain libraries for hashing, etc.). If the implementation deviated, say by using a quick workaround (like using a simple inline script for hashing instead of SubtleCrypto as planned), we should address that. **Recommendation:** Review if any shortcuts were taken (e.g., no hashing implemented yet, or using a different library than discussed). For hashing, if not done, implement using Web Crypto API as planned. Ensure any libraries introduced are justified (so far it seems we kept external deps minimal, which is good).
+* **Category Config – Static vs Dynamic:** The plan assumed static config for categories with an “Other” option for new tags. Implementation so far follows static config. There’s no divergence here, but a consideration: one might wonder if categories should be adjustable without code deploy. The team decided static is fine (with suggestions captured for later). This is consistent with plan. **Recommendation:** Maintain this approach, but document clearly how to update categories (code change and redeploy) and how “Other” suggestions are handled (manually reviewing feedback entries). This isn’t a change but an affirmation to ensure there’s no confusion. In the future, if someone requests dynamic categories, we can revisit, but it’s outside current scope.
+* **UI/UX Deviations:** Minor differences like possibly the UI design may have changed (perhaps the modal uses a different layout than initially drawn up). As long as core requirements (fields, labels, flows) are met, these are acceptable divergences. For example, if we ended up using a simple `<select>` for categories instead of radio buttons, that’s fine. **Recommendation:** Run a UX review (maybe with the docs team or a designer) after implementing all features to ensure the interface is clean and matches the original intent. If any deviations reduce usability (e.g., missing an “Other” field or the highlight approach is less intuitive than hoped), refine them now. We want to align with the spirit of the planned UX (simple 1-2-3 steps for feedback and a natural integration with the site style).
+* **Documentation Debt:** The plan outlines extensive documentation deliverables (README, diagrams, etc.), some of which are not done yet. **Recommendation:** Prioritize documentation as a first-class task, not an afterthought. Given this is open-source, a great README and clear usage instructions are as important as the code. Align with the plan’s documentation checklist. For instance, ensure we include the example `astro.config.mjs` snippet in the README, and explain each config option clearly (the plan even enumerated what to explain, which we should follow).
+* **Justified Divergences:** Not all deviations are negative; some are conscious improvements:
+
+  * We decided to create a standalone highlighter package (the plan did hint at possibly swapping Hypothesis, but it wasn’t fully fleshed out). This is a new development that goes beyond the original scope but will result in a better, more tailored solution. We justify this because it gives us full control and will likely result in a better DX for our plugin users.
+  * Testing strategy might shift slightly: if Playwright proves too heavy to set up in CI, we might choose an alternative (maybe Astro’s built-in testing and some manual testing). If so, justify it by documenting why (e.g., environment constraints) and ensure we still meet the quality goals. However, ideally we stick to the original plan and get Playwright working.
+* **Toolchain Version Updates:** One minor point – Astro or Starlight versions might have updated since planning. For example, if a new Starlight release changed how plugins are added, we might have had to adjust. These are low-level differences. **Recommendation:** Always keep our plugin compatible with the latest Astro/Starlight. Before final release, test with the current version of Astro (and note a minimum required version if needed). This ensures longevity and aligns with best practice to not lock into an old version unnecessarily.
+
+In conclusion, most deviations have been or will be resolved by bringing implementation back in line with the design blueprint. The critical functional changes (like dropping Hypothesis) are well-justified and beneficial. The remaining gaps (testing, polish, and slight architectural tweaks) have clear remedies as outlined. By following these recommendations, the StarMark project will realign with the initial engineering vision and deliver a robust, maintainable, and well-documented feedback plugin for Astro Starlight documentation sites.
