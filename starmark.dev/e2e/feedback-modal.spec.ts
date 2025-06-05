@@ -6,7 +6,14 @@ import type { Page } from '@playwright/test';
  */
 async function openFeedbackModal(page: Page): Promise<void> {
   await page.goto('/getting-started/quick-start');
-  await page.waitForLoadState('networkidle');
+  
+  // More robust waiting strategy - try networkidle but fall back to domcontentloaded
+  try {
+    await page.waitForLoadState('networkidle', { timeout: 10000 });
+  } catch {
+    // Firefox sometimes has issues with networkidle, fall back to domcontentloaded
+    await page.waitForLoadState('domcontentloaded');
+  }
   
   // Wait a bit for scripts to initialize
   await page.waitForTimeout(500);
@@ -280,11 +287,17 @@ test.describe('FeedbackModal Component', () => {
     // Modal should auto-close after a delay
     await expect(page.getByTestId('feedback-modal')).not.toBeVisible({ timeout: 5000 });
     
+    // Wait a bit for DOM cleanup to complete (especially important for Firefox)
+    await page.waitForTimeout(100);
+    
     // Re-open modal to verify form is reset
     const widget2 = page.getByTestId('feedback-widget');
     await widget2.focus();
     await widget2.click();
+    
+    // Wait for modal to be fully visible and initialized
     await expect(page.getByTestId('feedback-modal')).toBeVisible();
+    await page.waitForTimeout(100); // Additional wait for form initialization
     
     // Form should be reset
     const categoryValue = await page.locator('[name="category"]').inputValue();

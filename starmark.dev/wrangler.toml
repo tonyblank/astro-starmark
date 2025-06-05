@@ -1,0 +1,21 @@
+name = "starmark-dev"
+pages_build_output_dir = "./dist"
+compatibility_date = "2025-01-05"
+
+# KV namespace configuration - IDs set via environment variables
+# See wrangler.toml.example for setup instructions
+[[kv_namespaces]]
+binding = "SESSION"
+id = "${SESSION_KV_ID}"
+preview_id = "${SESSION_KV_PREVIEW_ID}"
+
+[env.production]
+name = "starmark-dev"
+
+# Production KV namespace - ID set via environment variable
+[[env.production.kv_namespaces]]
+binding = "SESSION"
+id = "${SESSION_KV_PRODUCTION_ID}"
+
+[build]
+command = "pnpm build" 
