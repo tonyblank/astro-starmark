@@ -19,6 +19,7 @@
     "clean": "rm -rf dist .astro"
   },
   "dependencies": {
+    "@astrojs/cloudflare": "^12.5.3",
     "@astrojs/starlight": "^0.34.3",
     "astro": "^5.8.2",
     "starmark-integration": "workspace:*"

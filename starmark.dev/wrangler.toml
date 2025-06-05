@@ -1,0 +1,18 @@
+name = "starmark-dev"
+pages_build_output_dir = "./dist"
+compatibility_date = "2025-01-05"
+
+[[kv_namespaces]]
+binding = "SESSION"
+id = "placeholder_id_to_be_set_in_production"
+preview_id = "placeholder_preview_id_for_development"
+
+[env.production]
+name = "starmark-dev"
+
+[[env.production.kv_namespaces]]
+binding = "SESSION"
+id = "production_session_kv_id_to_be_set"
+
+[build]
+command = "pnpm build" 

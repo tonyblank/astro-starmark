@@ -883,14 +883,19 @@ const {
       try {
         // Collect form data
         const formData = new FormData(form);
-        const data = {
+        const suggestedTag = formData.get("suggestedTag") as string | null;
+        const data: any = {
           page: window.location.pathname,
-          category: formData.get("category"),
-          comment: formData.get("comment"),
-          suggestedTag: formData.get("suggestedTag") || null,
+          category: formData.get("category") as string,
+          comment: formData.get("comment") as string,
           timestamp: new Date().toISOString(),
           userAgent: navigator.userAgent,
         };
+
+        // Only include suggestedTag if it has a value
+        if (suggestedTag && suggestedTag.trim()) {
+          data.suggestedTag = suggestedTag.trim();
+        }
 
         // Submit to API
         const response = await fetch("/api/feedback", {

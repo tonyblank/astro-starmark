@@ -187,5 +187,17 @@ export function starmark(
 // Re-export types for consumers
 export type { AstroIntegration };
 
+// Re-export feedback data types and schemas
+export {
+  FeedbackSchema,
+  FeedbackSubmissionResponseSchema,
+  type FeedbackData,
+  type FeedbackSubmissionResponse,
+  type FeedbackCategoryType,
+  createFeedbackData,
+  validateFeedbackData,
+  isValidFeedbackData,
+} from "./feedback-data";
+
 // Default export for convenience
 export default starmark;

@@ -1,10 +1,15 @@
 import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
 import starmark from 'starmark-integration';
+import cloudflare from '@astrojs/cloudflare';
 
 // https://astro.build/config
 export default defineConfig({
   site: 'https://starmark.dev',
+  adapter: cloudflare(),
+  devToolbar: {
+    enabled: process.env.NODE_ENV !== 'test' && !process.env.PLAYWRIGHT_TEST
+  },
   integrations: [
     starlight({
       title: 'StarMark',
@@ -51,7 +56,7 @@ export default defineConfig({
       debug: true,
     }),
   ],
-  output: 'static', // For now, we'll use static output for milestone 1
+  output: 'server', // Enable API routes for Milestone 4 feedback submission
   build: {
     inlineStylesheets: 'auto',
   },
