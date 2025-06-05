@@ -393,13 +393,13 @@ The frontend-to-backend submission pipeline is now fully functional and producti
       store: vi.fn().mockResolvedValue({ success: true, id: 'test-123' }),
       health: vi.fn().mockResolvedValue(true),
       getAnalytics: vi.fn().mockResolvedValue({ totalFeedback: 42, categories: { Typo: 10 } }),
-      detect: vi.fn().mockReturnValue(true)
+      detect: vi.fn().mockResolvedValue(true)
     };
     
     const registry = new StorageRegistry();
     registry.register(mockConnector);
     
-    const availableConnectors = registry.detectAvailable();
+    const availableConnectors = await registry.detectAvailable();
     expect(availableConnectors).toContain(mockConnector);
     
     const feedback: FeedbackData = { /* valid feedback */ };
@@ -410,7 +410,7 @@ The frontend-to-backend submission pipeline is now fully functional and producti
     expect(await mockConnector.health()).toBe(true);
   });
   ```
-- [ ] Define `StorageConnector` interface with detection capabilities
+- [ ] Define `StorageConnector` interface with async detection capabilities (`detect(): Promise<boolean>`)
 - [ ] Create `StorageRegistry` for auto-discovery of available connectors
 - [ ] Add base connector types with error handling and retry logic
 - [ ] Add health monitoring with circuit breaker pattern
@@ -582,13 +582,13 @@ The frontend-to-backend submission pipeline is now fully functional and producti
       name: 'linear',
       store: vi.fn().mockResolvedValue({ success: true, id: 'linear-123' }),
       health: vi.fn().mockResolvedValue(true),
-      detect: vi.fn().mockReturnValue(true)
+      detect: vi.fn().mockResolvedValue(true)
     };
     const mockAstroDB = { 
       name: 'astrodb',
       store: vi.fn().mockRejectedValue(new Error('DB connection failed')),
       health: vi.fn().mockResolvedValue(false),
-      detect: vi.fn().mockReturnValue(true)
+      detect: vi.fn().mockResolvedValue(true)
     };
     
     const registry = new StorageRegistry();
