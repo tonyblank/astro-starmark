@@ -2,45 +2,94 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import { join } from 'path';
+import { parse } from '@astrojs/compiler';
+
+/**
+ * Helper function to parse Astro component and extract HTML elements
+ */
+async function parseAstroComponent(componentContent: string) {
+  const result = await parse(componentContent);
+  return result;
+}
+
+/**
+ * Helper function to find elements by attribute using regex patterns
+ */
+function findElementByAttribute(content: string, attribute: string, value?: string): boolean {
+  if (value) {
+    const pattern = new RegExp(`${attribute}\\s*=\\s*["']${value}["']`, 'i');
+    return pattern.test(content);
+  } else {
+    const pattern = new RegExp(`\\b${attribute}\\b`, 'i');
+    return pattern.test(content);
+  }
+}
+
+/**
+ * Helper function to find form fields by name attribute
+ */
+function findFormField(content: string, fieldName: string, fieldType?: string): boolean {
+  const namePattern = new RegExp(`name\\s*=\\s*["']${fieldName}["']`, 'i');
+  if (fieldType) {
+    const typePattern = new RegExp(`<${fieldType}[^>]*name\\s*=\\s*["']${fieldName}["']`, 'i');
+    return typePattern.test(content);
+  }
+  return namePattern.test(content);
+}
+
+
 
 describe('FeedbackModal Component', () => {
   const componentPath = join(__dirname, '../src/client/FeedbackModal.astro');
   
-  it('modal renders with proper form fields', () => {
+  it('modal renders with proper form fields', async () => {
     const componentContent = readFileSync(componentPath, 'utf-8');
     
-    // Check basic modal structure
-    expect(componentContent).toContain('data-testid="feedback-modal"');
-    expect(componentContent).toContain('role="dialog"');
-    expect(componentContent).toContain('aria-labelledby');
-    expect(componentContent).toContain('aria-modal="true"');
+    // Parse the component AST for more robust testing
+    const ast = await parseAstroComponent(componentContent);
+    expect(ast).toBeDefined();
+    expect(ast.ast).toBeDefined();
     
-    // Check form structure
-    expect(componentContent).toContain('<form');
-    expect(componentContent).toContain('name="category"');
-    expect(componentContent).toContain('name="comment"');
-    expect(componentContent).toContain('name="suggestedTag"');
-    expect(componentContent).toContain('type="submit"');
+    // Check basic modal structure using robust attribute matching
+    expect(findElementByAttribute(componentContent, 'data-testid', 'feedback-modal')).toBe(true);
+    expect(findElementByAttribute(componentContent, 'role', 'dialog')).toBe(true);
+    expect(findElementByAttribute(componentContent, 'aria-labelledby')).toBe(true);
+    expect(findElementByAttribute(componentContent, 'aria-modal', 'true')).toBe(true);
+    
+    // Check form structure using element detection
+    expect(/<form\b[^>]*>/i.test(componentContent)).toBe(true);
+    expect(findFormField(componentContent, 'category')).toBe(true);
+    expect(findFormField(componentContent, 'comment')).toBe(true);
+    expect(findFormField(componentContent, 'suggestedTag')).toBe(true);
+    expect(findElementByAttribute(componentContent, 'type', 'submit')).toBe(true);
   });
 
-  it('modal form has required fields and validation', () => {
+  it('modal form has required fields and validation', async () => {
     const componentContent = readFileSync(componentPath, 'utf-8');
     
-    // Check for form fields
-    expect(componentContent).toContain('name="category"');
-    expect(componentContent).toContain('name="comment"');
-    expect(componentContent).toContain('name="suggestedTag"');
-    expect(componentContent).toContain('required');
+    // Parse component AST
+    const ast = await parseAstroComponent(componentContent);
+    expect(ast).toBeDefined();
+    expect(ast.ast).toBeDefined();
     
-    // Check for dropdown structure (JSX style) - formatted by Prettier
-    expect(componentContent).toContain('categories.map((category) => (');
-    expect(componentContent).toContain('<option value={category}>{category}</option>');
+    // Check for form fields using robust patterns
+    expect(findFormField(componentContent, 'category', 'select')).toBe(true);
+    expect(findFormField(componentContent, 'comment', 'textarea')).toBe(true);
+    expect(findFormField(componentContent, 'suggestedTag', 'input')).toBe(true);
+    expect(findElementByAttribute(componentContent, 'required')).toBe(true);
+    
+    // Check for dropdown structure using more flexible patterns
+    const categoryMapPattern = /categories\.map\s*\(\s*\(?\s*category\s*(?:,\s*\w+)?\s*\)?\s*=>\s*\(/i;
+    expect(categoryMapPattern.test(componentContent)).toBe(true);
+    
+    const optionPattern = /<option[^>]*value\s*=\s*\{category\}[^>]*>\s*\{category\}\s*<\/option>/i;
+    expect(optionPattern.test(componentContent)).toBe(true);
     
     // Check for character limit
-    expect(componentContent).toContain('maxlength');
+    expect(findElementByAttribute(componentContent, 'maxlength')).toBe(true);
     
     // Check for validation attributes
-    expect(componentContent).toContain('aria-describedby');
+    expect(findElementByAttribute(componentContent, 'aria-describedby')).toBe(true);
   });
 
   it('modal has correct CSS styling and positioning', () => {
@@ -123,7 +172,7 @@ describe('FeedbackModal Component', () => {
     const componentContent = readFileSync(componentPath, 'utf-8');
     
     // Check that script includes proper modal behavior
-    expect(componentContent).toContain('<script>');
+    expect(componentContent).toMatch(/<script(\s+lang="ts")?>/i);
     expect(componentContent).toContain('addEventListener');
     expect(componentContent).toContain('preventDefault');
     expect(componentContent).toContain('Escape');

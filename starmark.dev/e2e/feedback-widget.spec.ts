@@ -91,7 +91,7 @@ test.describe('FeedbackWidget Component', () => {
     });
     
     expect(styles.position).toBe('fixed');
-    expect(styles.zIndex).toBe('9999');
+    expect(styles.zIndex).toBe('999999');
   });
 
   test('widget supports keyboard navigation', async ({ page }) => {

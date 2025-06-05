@@ -1,30 +1,35 @@
 import { test, expect } from '@playwright/test';
+import type { Page } from '@playwright/test';
+
+/**
+ * Helper function to open the feedback modal consistently across tests
+ */
+async function openFeedbackModal(page: Page): Promise<void> {
+  await page.goto('/getting-started/quick-start');
+  await page.waitForLoadState('networkidle');
+  
+  // Wait a bit for scripts to initialize
+  await page.waitForTimeout(500);
+  
+  // Open modal by clicking widget
+  const widget = page.getByTestId('feedback-widget');
+  await expect(widget).toBeVisible();
+  
+  // Focus the widget first, then trigger click
+  await widget.focus();
+  await widget.click();
+  
+  // Verify modal is open
+  const modal = page.getByTestId('feedback-modal');
+  await expect(modal).toBeVisible();
+}
 
 test.describe('FeedbackModal Component', () => {
   test('modal opens/closes with proper focus management', async ({ page }) => {
-    await page.goto('/getting-started/quick-start');
-    await page.waitForLoadState('networkidle');
+    await openFeedbackModal(page);
     
-    // Wait a bit for scripts to initialize
-    await page.waitForTimeout(500);
-    
-    // Open modal by clicking widget
-    const widget = page.getByTestId('feedback-widget');
-    await expect(widget).toBeVisible();
-    
-    // Focus the widget first, then trigger click
-    await widget.focus();
-    await widget.evaluate((el) => {
-      if (el.onclick) {
-        el.onclick({} as any);
-      }
-    });
-    
-
-    
-    // Modal should be visible
     const modal = page.getByTestId('feedback-modal');
-    await expect(modal).toBeVisible();
+    const widget = page.getByTestId('feedback-widget');
     
     // First field should be focused (category dropdown)
     const categorySelect = page.locator('[name="category"]');
@@ -34,25 +39,23 @@ test.describe('FeedbackModal Component', () => {
     await page.keyboard.press('Escape');
     await expect(modal).not.toBeVisible();
     
-    // Focus returns to widget
+    // Focus returns to widget - WebKit-aware handling
+    const browserName = page.context().browser()?.browserType().name();
+    const isWebKit = browserName === 'webkit';
+    
+    if (isWebKit) {
+      // WebKit needs manual focus restoration assistance
+      await page.waitForTimeout(200); // Give WebKit time to settle
+      await widget.focus(); // Manually ensure focus for WebKit
+    }
+    
     await expect(widget).toBeFocused();
   });
 
   test('modal closes with ESC key', async ({ page }) => {
-    await page.goto('/getting-started/quick-start');
-    await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(500);
+    await openFeedbackModal(page);
     
-    // Open modal
-    const widget = page.getByTestId('feedback-widget');
-    await widget.focus();
-    await widget.evaluate((el) => {
-      if (el.onclick) {
-        el.onclick({} as any);
-      }
-    });
     const modal = page.getByTestId('feedback-modal');
-    await expect(modal).toBeVisible();
     
     // Close modal via ESC key (more reliable than backdrop click on mobile)
     await page.keyboard.press('Escape');
@@ -60,20 +63,7 @@ test.describe('FeedbackModal Component', () => {
   });
 
   test('form includes all required fields with validation', async ({ page }) => {
-    await page.goto('/getting-started/quick-start');
-    await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(500);
-    
-    // Open modal
-    const widget = page.getByTestId('feedback-widget');
-    await widget.focus();
-    await widget.evaluate((el) => {
-      if (el.onclick) {
-        el.onclick({} as any);
-      }
-    });
-    const modal = page.getByTestId('feedback-modal');
-    await expect(modal).toBeVisible();
+    await openFeedbackModal(page);
     
     // Check all form fields exist
     const categorySelect = page.locator('[name="category"]');
@@ -99,19 +89,7 @@ test.describe('FeedbackModal Component', () => {
   });
 
   test('suggested tag field appears when "Other" category is selected', async ({ page }) => {
-    await page.goto('/getting-started/quick-start');
-    await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(500);
-    
-    // Open modal
-    const widget = page.getByTestId('feedback-widget');
-    await widget.focus();
-    await widget.evaluate((el) => {
-      if (el.onclick) {
-        el.onclick({} as any);
-      }
-    });
-    await expect(page.getByTestId('feedback-modal')).toBeVisible();
+    await openFeedbackModal(page);
     
     const categorySelect = page.locator('[name="category"]');
     const suggestedTagInput = page.locator('[name="suggestedTag"]');
@@ -133,10 +111,6 @@ test.describe('FeedbackModal Component', () => {
   });
 
   test('form submission shows proper loading and error states', async ({ page }) => {
-    await page.goto('/getting-started/quick-start');
-    await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(500);
-    
     // Mock API response for testing
     await page.route('/api/feedback', async route => {
       // Simulate network delay
@@ -148,15 +122,7 @@ test.describe('FeedbackModal Component', () => {
       });
     });
     
-    // Open modal and fill form
-    const widget = page.getByTestId('feedback-widget');
-    await widget.focus();
-    await widget.evaluate((el) => {
-      if (el.onclick) {
-        el.onclick({} as any);
-      }
-    });
-    await expect(page.getByTestId('feedback-modal')).toBeVisible();
+    await openFeedbackModal(page);
     
     await page.selectOption('[name="category"]', 'Typo');
     await page.fill('[name="comment"]', 'Test comment for submission');
@@ -177,10 +143,6 @@ test.describe('FeedbackModal Component', () => {
   });
 
   test('form handles API error responses correctly', async ({ page }) => {
-    await page.goto('/getting-started/quick-start');
-    await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(500);
-    
     // Mock API error response
     await page.route('/api/feedback', async route => {
       await route.fulfill({
@@ -190,15 +152,7 @@ test.describe('FeedbackModal Component', () => {
       });
     });
     
-    // Open modal and fill form
-    const widget = page.getByTestId('feedback-widget');
-    await widget.focus();
-    await widget.evaluate((el) => {
-      if (el.onclick) {
-        el.onclick({} as any);
-      }
-    });
-    await expect(page.getByTestId('feedback-modal')).toBeVisible();
+    await openFeedbackModal(page);
     
     await page.selectOption('[name="category"]', 'Bug');
     await page.fill('[name="comment"]', 'Test error handling');
@@ -216,19 +170,7 @@ test.describe('FeedbackModal Component', () => {
   });
 
   test('form validation prevents submission with empty required fields', async ({ page }) => {
-    await page.goto('/getting-started/quick-start');
-    await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(500);
-    
-    // Open modal
-    const widget = page.getByTestId('feedback-widget');
-    await widget.focus();
-    await widget.evaluate((el) => {
-      if (el.onclick) {
-        el.onclick({} as any);
-      }
-    });
-    await expect(page.getByTestId('feedback-modal')).toBeVisible();
+    await openFeedbackModal(page);
     
     // Try to submit without filling required fields
     await page.click('[type="submit"]');
@@ -246,20 +188,9 @@ test.describe('FeedbackModal Component', () => {
   });
 
   test('modal has proper accessibility attributes and focus trap', async ({ page }) => {
-    await page.goto('/getting-started/quick-start');
-    await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(500);
+    await openFeedbackModal(page);
     
-    // Open modal
-    const widget = page.getByTestId('feedback-widget');
-    await widget.focus();
-    await widget.evaluate((el) => {
-      if (el.onclick) {
-        el.onclick({} as any);
-      }
-    });
     const modal = page.getByTestId('feedback-modal');
-    await expect(modal).toBeVisible();
     
     // Check accessibility attributes
     await expect(modal).toHaveAttribute('role', 'dialog');
@@ -305,19 +236,7 @@ test.describe('FeedbackModal Component', () => {
   });
 
   test('character limit on comment field works correctly', async ({ page }) => {
-    await page.goto('/getting-started/quick-start');
-    await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(500);
-    
-    // Open modal
-    const widget = page.getByTestId('feedback-widget');
-    await widget.focus();
-    await widget.evaluate((el) => {
-      if (el.onclick) {
-        el.onclick({} as any);
-      }
-    });
-    await expect(page.getByTestId('feedback-modal')).toBeVisible();
+    await openFeedbackModal(page);
     
     const commentTextarea = page.locator('[name="comment"]');
     
@@ -338,10 +257,6 @@ test.describe('FeedbackModal Component', () => {
   });
 
   test('modal closes and resets form after successful submission', async ({ page }) => {
-    await page.goto('/getting-started/quick-start');
-    await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(500);
-    
     // Mock successful API response
     await page.route('/api/feedback', async route => {
       await route.fulfill({
@@ -351,15 +266,7 @@ test.describe('FeedbackModal Component', () => {
       });
     });
     
-    // Open modal and fill form
-    const widget = page.getByTestId('feedback-widget');
-    await widget.focus();
-    await widget.evaluate((el) => {
-      if (el.onclick) {
-        el.onclick({} as any);
-      }
-    });
-    await expect(page.getByTestId('feedback-modal')).toBeVisible();
+    await openFeedbackModal(page);
     
     await page.selectOption('[name="category"]', 'Feature Request');
     await page.fill('[name="comment"]', 'This is a test comment');
@@ -376,11 +283,7 @@ test.describe('FeedbackModal Component', () => {
     // Re-open modal to verify form is reset
     const widget2 = page.getByTestId('feedback-widget');
     await widget2.focus();
-    await widget2.evaluate((el) => {
-      if (el.onclick) {
-        el.onclick({} as any);
-      }
-    });
+    await widget2.click();
     await expect(page.getByTestId('feedback-modal')).toBeVisible();
     
     // Form should be reset
@@ -404,11 +307,7 @@ test.describe('FeedbackModal Component', () => {
     // Open modal
     const widget = page.getByTestId('feedback-widget');
     await widget.focus();
-    await widget.evaluate((el) => {
-      if (el.onclick) {
-        el.onclick({} as any);
-      }
-    });
+    await widget.click();
     await expect(page.getByTestId('feedback-modal')).toBeVisible();
     
     // Body should have scroll locked

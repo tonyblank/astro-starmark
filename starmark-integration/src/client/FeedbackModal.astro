@@ -1,5 +1,6 @@
 ---
 import "../types.ts"; // Import for global Window interface extensions
+import { DEFAULT_FEEDBACK_CATEGORIES } from "../constants.ts";
 
 export interface Props {
   /**
@@ -10,7 +11,7 @@ export interface Props {
   /**
    * Categories available in the feedback form
    */
-  categories?: string[];
+  categories?: readonly string[];
 
   /**
    * Callback when modal is closed
@@ -25,14 +26,9 @@ export interface Props {
 
 const {
   isOpen = false,
-  categories = [
-    "Bug",
-    "Feature Request",
-    "Question",
-    "Typo",
-    "Confusing",
-    "Other",
-  ],
+  categories = DEFAULT_FEEDBACK_CATEGORIES,
+  onClose,
+  onSubmit,
 } = Astro.props;
 ---
 
@@ -78,8 +74,10 @@ const {
         >
           <option value="">Select a category...</option>
           {
-            categories.map((category) => (
-              <option value={category}>{category}</option>
+            categories.map((category, index) => (
+              <option key={`category-${index}`} value={category}>
+                {category}
+              </option>
             ))
           }
         </select>
@@ -548,6 +546,11 @@ const {
   }
 </style>
 
+<script define:vars={{ onClose, onSubmit }}>
+  // Pass props to client-side script
+  window.starmarkFeedbackProps = { onClose, onSubmit };
+</script>
+
 <script>
   // Client-side modal functionality
   (function () {
@@ -558,50 +561,41 @@ const {
       return;
     }
 
-    let modal: HTMLElement | null = null;
-    let form: HTMLFormElement | null = null;
-    let categorySelect: HTMLSelectElement | null = null;
-    let suggestedTagField: HTMLElement | null = null;
-    let suggestedTagInput: HTMLInputElement | null = null;
-    let commentTextarea: HTMLTextAreaElement | null = null;
-    let characterCounter: HTMLElement | null = null;
-    let closeButton: HTMLButtonElement | null = null;
-    let submitButton: HTMLButtonElement | null = null;
+    let modal = null;
+    let form = null;
+    let categorySelect = null;
+    let suggestedTagField = null;
+    let suggestedTagInput = null;
+    let commentTextarea = null;
+    let characterCounter = null;
+    let closeButton = null;
+    let submitButton = null;
     let originalBodyOverflow = "";
-    let previouslyFocusedElement: HTMLElement | null = null;
+    let previouslyFocusedElement = null;
 
     // Form state
-    type FormState = "idle" | "loading" | "success" | "error";
-    let currentState: FormState = "idle";
+    let currentState = "idle";
+
+    // Callback props from parent component
+    let modalOnClose;
+    let modalOnSubmit;
 
     function initializeModal() {
-      modal = document.querySelector(
-        '[data-testid="feedback-modal"]',
-      ) as HTMLElement;
+      modal = document.querySelector('[data-testid="feedback-modal"]');
       if (!modal) return;
 
-      form = modal.querySelector(".feedback-modal__form") as HTMLFormElement;
-      categorySelect = modal.querySelector(
-        '[name="category"]',
-      ) as HTMLSelectElement;
+      form = modal.querySelector(".feedback-modal__form");
+      categorySelect = modal.querySelector('[name="category"]');
       suggestedTagField = modal.querySelector(
         ".feedback-modal__field--suggested-tag",
-      ) as HTMLElement;
-      suggestedTagInput = modal.querySelector(
-        '[name="suggestedTag"]',
-      ) as HTMLInputElement;
-      commentTextarea = modal.querySelector(
-        '[name="comment"]',
-      ) as HTMLTextAreaElement;
+      );
+      suggestedTagInput = modal.querySelector('[name="suggestedTag"]');
+      commentTextarea = modal.querySelector('[name="comment"]');
       characterCounter = modal.querySelector(
         '[data-testid="character-counter"]',
-      ) as HTMLElement;
-      closeButton = modal.querySelector(
-        ".feedback-modal__close",
-      ) as HTMLButtonElement;
-      submitButton = modal.querySelector(
-        ".feedback-modal__submit",
-      ) as HTMLButtonElement;
+      );
+      closeButton = modal.querySelector(".feedback-modal__close");
+      submitButton = modal.querySelector(".feedback-modal__submit");
 
       setupEventListeners();
       setupFocusTrap();
@@ -737,8 +731,17 @@ const {
       }
     }
 
-    function openModal() {
+    function openModal(
+      onCloseCallback?: () => void,
+      onSubmitCallback?: () => Promise<void>,
+    ) {
       if (!modal) return;
+
+      // Store callback functions
+      modalOnClose =
+        onCloseCallback || (window as any).starmarkFeedbackProps?.onClose;
+      modalOnSubmit =
+        onSubmitCallback || (window as any).starmarkFeedbackProps?.onSubmit;
 
       // Store current focus
       previouslyFocusedElement = document.activeElement as HTMLElement;
@@ -768,12 +771,58 @@ const {
       // Restore body scroll
       document.body.style.overflow = originalBodyOverflow;
 
-      // Restore focus with a slight delay to ensure modal is fully closed
+      // Restore focus with WebKit-aware delay and retry logic
+      // WebKit browsers need more time for DOM changes to settle
+      const isWebKit =
+        /^((?!chrome|android).)*safari/i.test(navigator.userAgent) ||
+        /webkit/i.test(navigator.userAgent);
+
+      const focusDelay = isWebKit ? 100 : 10;
+
       setTimeout(() => {
         if (previouslyFocusedElement) {
-          previouslyFocusedElement.focus();
+          try {
+            previouslyFocusedElement.focus();
+
+            // For WebKit, verify focus took and retry if needed
+            if (isWebKit) {
+              setTimeout(() => {
+                if (
+                  document.activeElement !== previouslyFocusedElement &&
+                  previouslyFocusedElement
+                ) {
+                  try {
+                    previouslyFocusedElement.focus();
+                  } catch {
+                    // Fallback: focus the widget by ID if element reference fails
+                    const widget = document.getElementById(
+                      "starmark-feedback-widget",
+                    );
+                    if (widget) {
+                      widget.focus();
+                    }
+                  }
+                }
+              }, 50);
+            }
+          } catch {
+            // Fallback for any focus errors
+            const widget = document.getElementById("starmark-feedback-widget");
+            if (widget) {
+              widget.focus();
+            }
+          }
         }
-      }, 10);
+
+        // Call onClose callback after focus restoration is complete
+        if (modalOnClose) {
+          try {
+            modalOnClose();
+          } catch (error) {
+            console.error("Error calling onClose callback:", error);
+          }
+        }
+      }, focusDelay);
 
       // Reset form if not in success state
       if (currentState !== "success") {
@@ -781,11 +830,11 @@ const {
       }
     }
 
-    function isModalOpen(): boolean {
+    function isModalOpen() {
       return modal?.classList.contains("feedback-modal--open") || false;
     }
 
-    function setFormState(state: FormState) {
+    function setFormState(state) {
       if (!form) return;
 
       currentState = state;
@@ -825,7 +874,7 @@ const {
       });
     }
 
-    async function handleSubmit(event: Event) {
+    async function handleSubmit(event) {
       event.preventDefault();
       if (!form || currentState === "loading") return;
 
@@ -854,6 +903,15 @@ const {
 
         if (response.ok) {
           setFormState("success");
+
+          // Call onSubmit callback if provided
+          if (modalOnSubmit) {
+            try {
+              await modalOnSubmit();
+            } catch (error) {
+              console.error("Error calling onSubmit callback:", error);
+            }
+          }
         } else {
           throw new Error("Submission failed");
         }
@@ -884,8 +942,40 @@ const {
       close: closeModal,
       isOpen: isModalOpen,
       cleanup: function () {
+        // Remove global document listener
         document.removeEventListener("keydown", handleKeydown);
-        // Additional cleanup as needed
+
+        // Remove modal and form event listeners
+        if (modal) {
+          modal.removeEventListener("click", handleBackdropClick);
+        }
+
+        if (closeButton) {
+          closeButton.removeEventListener("click", closeModal);
+        }
+
+        if (form) {
+          form.removeEventListener("submit", handleSubmit);
+        }
+
+        if (categorySelect) {
+          categorySelect.removeEventListener("change", handleCategoryChange);
+        }
+
+        if (commentTextarea) {
+          commentTextarea.removeEventListener("input", updateCharacterCounter);
+        }
+
+        const retryButton = modal?.querySelector(
+          '[data-testid="retry-button"]',
+        );
+        if (retryButton) {
+          retryButton.removeEventListener("click", handleRetry);
+        }
+
+        // Clear callback references to prevent potential memory leaks
+        modalOnClose = undefined;
+        modalOnSubmit = undefined;
       },
     };
 
