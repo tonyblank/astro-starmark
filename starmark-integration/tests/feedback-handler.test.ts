@@ -114,6 +114,7 @@ describe('FeedbackHandler', () => {
     expect(result.success).toBe(true);
     expect(result.results).toHaveLength(1);
     expect(result.results[0].connector).toBe('linear');
+    expect(result.results[0].success).toBe(true);
   });
 
   test('should handle no available connectors', async () => {
@@ -154,6 +155,10 @@ describe('FeedbackHandler', () => {
     
     const linearResult = result.results.find(r => r.connector === 'linear');
     const astroDbResult = result.results.find(r => r.connector === 'astrodb');
+    
+    // Ensure healthy property exists on all results
+    expect(linearResult).toHaveProperty('healthy');
+    expect(astroDbResult).toHaveProperty('healthy');
     
     expect(linearResult?.healthy).toBe(false);
     expect(astroDbResult?.healthy).toBe(true);

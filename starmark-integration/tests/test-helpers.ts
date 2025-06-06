@@ -42,10 +42,10 @@ export async function renderAstroComponentToString(
  */
 export class MockStorageConnector {
   public name: string;
-  private detectionResult: boolean = true;
+  private detectionResult = true;
   private detectionError: Error | null = null;
   private storeResults: import('../src/types').StorageResult[] = [];
-  private healthResult: boolean = true;
+  private healthResult = true;
   private analyticsResult: import('../src/types').AnalyticsData | null = null;
 
   constructor(name: string) {
@@ -54,7 +54,11 @@ export class MockStorageConnector {
 
   async store(_feedback: import('../src/types').FeedbackData): Promise<import('../src/types').StorageResult> {
     if (this.storeResults.length > 0) {
-      return this.storeResults.shift()!;
+      const result = this.storeResults.shift();
+      if (!result) {
+        throw new Error('No queued results available');
+      }
+      return result;
     }
     return {
       success: true,

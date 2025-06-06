@@ -62,11 +62,13 @@ export class FeedbackHandler {
             ...result.value,
           };
         } else {
+          // Check if the rejection has retryable information, default to false for safety
+          const retryable = result.reason?.retryable ?? false;
           return {
             connector: connector.name,
             success: false,
             error: result.reason?.message || "Unknown error",
-            retryable: true,
+            retryable,
             healthy: false,
           };
         }

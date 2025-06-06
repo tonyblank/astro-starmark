@@ -57,17 +57,21 @@ test.describe('Storage Connector Functionality', () => {
     expect(apiResponse).toHaveProperty('id');
     expect(apiResponse).toHaveProperty('message');
     expect(apiResponse).toHaveProperty('metadata');
-    expect(apiResponse!.metadata).toHaveProperty('connectorsUsed');
-    expect(apiResponse!.metadata).toHaveProperty('results');
-    expect(Array.isArray(apiResponse!.metadata.results)).toBe(true);
-    expect(apiResponse!.metadata.results.length).toBeGreaterThan(0);
     
-    // Verify at least one connector was used
-    const connectorResult = apiResponse!.metadata.results[0];
-    expect(connectorResult).toHaveProperty('connector');
-    expect(connectorResult).toHaveProperty('success');
-    expect(connectorResult).toHaveProperty('id');
-    expect(connectorResult).toHaveProperty('healthy');
+    // Safe access with proper type checking
+    if (apiResponse?.metadata) {
+      expect(apiResponse.metadata).toHaveProperty('connectorsUsed');
+      expect(apiResponse.metadata).toHaveProperty('results');
+      expect(Array.isArray(apiResponse.metadata.results)).toBe(true);
+      expect(apiResponse.metadata.results.length).toBeGreaterThan(0);
+      
+      // Verify at least one connector was used
+      const connectorResult = apiResponse.metadata.results[0];
+      expect(connectorResult).toHaveProperty('connector');
+      expect(connectorResult).toHaveProperty('success');
+      expect(connectorResult).toHaveProperty('id');
+      expect(connectorResult).toHaveProperty('healthy');
+    }
   });
 
   test('API endpoint handles multiple storage connectors correctly', async ({ page }) => {

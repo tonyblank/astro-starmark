@@ -1,15 +1,15 @@
 // ES module replacement for cssesc
 const cssesc = function(string, options) {
-  options = options || {};
+  const opts = options || {};
   
-  if (options.quotes != 'single' && options.quotes != 'double') {
-    options.quotes = 'single';
+  if (opts.quotes != 'single' && opts.quotes != 'double') {
+    opts.quotes = 'single';
   }
   
-  const quote = options.quotes == 'double' ? '"' : "'";
-  const isIdentifier = options.isIdentifier;
+  const quote = opts.quotes == 'double' ? '"' : "'";
+  const isIdentifier = opts.isIdentifier;
   
-  if (!string) return options.wrap ? quote + quote : '';
+  if (!string) return opts.wrap ? quote + quote : '';
   
   let output = '';
   let counter = 0;
@@ -26,27 +26,27 @@ const cssesc = function(string, options) {
         const extra = string.charCodeAt(counter++);
         if ((extra & 0xFC00) == 0xDC00) {
           const combinedCodePoint = ((codePoint & 0x3FF) << 10) + (extra & 0x3FF) + 0x10000;
-          value = '\\' + combinedCodePoint.toString(16).toUpperCase() + ' ';
+          value = `\\${combinedCodePoint.toString(16).toUpperCase()} `;
         } else {
           counter--;
-          value = '\\' + codePoint.toString(16).toUpperCase() + ' ';
+          value = `\\${codePoint.toString(16).toUpperCase()} `;
         }
       } else {
-        value = '\\' + codePoint.toString(16).toUpperCase() + ' ';
+        value = `\\${codePoint.toString(16).toUpperCase()} `;
       }
     } else {
-      if (options.escapeEverything) {
+      if (opts.escapeEverything) {
         if (/[ -,./:\-@[\]^`{-~]/.test(character)) {
-          value = '\\' + character;
+          value = `\\${character}`;
         } else {
-          value = '\\' + codePoint.toString(16).toUpperCase() + ' ';
+          value = `\\${codePoint.toString(16).toUpperCase()} `;
         }
       } else if (/[\t\n\f\r\v]/.test(character)) {
-        value = '\\' + codePoint.toString(16).toUpperCase() + ' ';
+        value = `\\${codePoint.toString(16).toUpperCase()} `;
       } else if (character == '\\' || 
                 (!isIdentifier && (character == '"' && quote == character || character == "'" && quote == character)) ||
                 (isIdentifier && /[ -,./:\-@[\]^`{-~]/.test(character))) {
-        value = '\\' + character;
+        value = `\\${character}`;
       } else {
         value = character;
       }
@@ -56,9 +56,9 @@ const cssesc = function(string, options) {
   
   if (isIdentifier) {
     if (/^-[-\d]/.test(output)) {
-      output = '\\-' + output.slice(1);
+      output = `\\-${output.slice(1)}`;
     } else if (/\d/.test(string.charAt(0))) {
-      output = '\\3' + string.charAt(0) + ' ' + output.slice(1);
+      output = `\\3${string.charAt(0)} ${output.slice(1)}`;
     }
   }
   
@@ -70,7 +70,7 @@ const cssesc = function(string, options) {
     return ($1 || '') + $2;
   });
   
-  if (!isIdentifier && options.wrap) {
+  if (!isIdentifier && opts.wrap) {
     return quote + output + quote;
   }
   

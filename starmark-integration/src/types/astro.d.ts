@@ -12,8 +12,8 @@ declare module "*.astro" {
 }
 
 declare module "astro:db" {
-  export const db: any;
-  export const Feedback: any;
+  export const db: unknown;
+  export const Feedback: unknown;
   export const sql: {
     count: (column?: string) => string;
     desc: (column: string) => string;

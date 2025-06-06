@@ -13,6 +13,11 @@ export class MockConnector implements StorageConnector {
   name = "mock";
   private feedbackCount = 0;
   private feedbackHistory: FeedbackData[] = [];
+  private latencyMs: number;
+
+  constructor(latencyMs = 0) {
+    this.latencyMs = latencyMs;
+  }
 
   async detect(): Promise<boolean> {
     // Always available in development/test environments
@@ -25,14 +30,16 @@ export class MockConnector implements StorageConnector {
   }
 
   async store(feedback: FeedbackData): Promise<StorageResult> {
-    // Simulate processing time
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    // Simulate processing time if latency is enabled
+    if (this.latencyMs > 0) {
+      await new Promise((resolve) => setTimeout(resolve, this.latencyMs));
+    }
 
     // Store feedback in memory
     this.feedbackHistory.push(feedback);
     this.feedbackCount++;
 
-    const id = `mock_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const id = `mock_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
 
     console.log("Mock Connector: Feedback stored successfully", {
       id,
@@ -53,7 +60,7 @@ export class MockConnector implements StorageConnector {
 
   async getAnalytics(): Promise<AnalyticsData> {
     const categoryCount: Record<string, number> = {};
-    const pageStats: Array<{ page: string; count: number }> = [];
+    const pageCounts = new Map<string, number>();
 
     // Analyze stored feedback
     this.feedbackHistory.forEach((feedback) => {
@@ -61,19 +68,19 @@ export class MockConnector implements StorageConnector {
       categoryCount[feedback.category] =
         (categoryCount[feedback.category] || 0) + 1;
 
-      // Count pages
-      const existing = pageStats.find((stat) => stat.page === feedback.page);
-      if (existing) {
-        existing.count++;
-      } else {
-        pageStats.push({ page: feedback.page, count: 1 });
-      }
+      // Count pages efficiently using Map
+      pageCounts.set(feedback.page, (pageCounts.get(feedback.page) ?? 0) + 1);
     });
+
+    // Convert Map to sorted array
+    const pageStats = [...pageCounts]
+      .map(([page, count]) => ({ page, count }))
+      .sort((a, b) => b.count - a.count);
 
     return {
       totalFeedback: this.feedbackCount,
       categories: categoryCount,
-      pageStats: pageStats.sort((a, b) => b.count - a.count),
+      pageStats,
     };
   }
 

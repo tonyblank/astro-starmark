@@ -21,9 +21,12 @@
 - ✅ Milestone 4: Frontend->Backend Submission Logic
 
 **Current Work:**
-- 🚧 Milestone 5: Storage Connectors (on branch: `migrate_to_taskmaster_claude`)
+- ✅ Milestone 5: Storage Connectors (completed, ready for review)
 
-**Test Coverage:** 47/47 unit tests passing, comprehensive E2E test suite
+**Next Work:**
+- 🚧 CodeRabbit review integration and cleanup
+
+**Test Coverage:** 90/90 unit tests passing, 235/235 E2E tests passing, comprehensive test suite
 
 ## Project Structure
 
@@ -81,6 +84,9 @@ pnpm build                              # Build all packages
 pnpm test:unit                          # Unit tests
 pnpm test:e2e                           # E2E tests (requires browsers)
 pnpm test:watch                         # Watch mode
+
+# CI/CD Pipeline
+pnpm ci-check                           # Full CI pipeline (type-check, lint, format, build, test, e2e)
 ```
 
 ### Running the Project
@@ -303,6 +309,43 @@ NODE_ENV=development
 ```
 
 **Note:** The starmark.dev site should have a `.env` file with your Linear credentials for testing the storage connectors. We can add these as you provide them.
+
+## Code Review Process
+
+### CodeRabbit Integration
+The project uses CodeRabbit for automated code review and feedback. All pull requests are automatically reviewed with actionable suggestions for:
+
+- **Type Safety Improvements**: Replace `any` types with more specific types or `unknown`
+- **Performance Optimizations**: Use template literals instead of string concatenation, avoid deprecated methods
+- **Code Quality**: Remove trivially inferred type annotations, use proper error handling
+- **Test Coverage**: Ensure proper assertions and edge case coverage
+- **Documentation**: Maintain consistency in comments and field explanations
+
+### Addressing CodeRabbit Comments
+1. **Systematic Review**: Address all actionable comments in order
+2. **Fix Implementation**: Apply suggested improvements with proper testing
+3. **Response Documentation**: Reply to each comment with summary of fix applied
+4. **Verification**: Ensure all CI checks pass after addressing feedback
+
+### Key CodeRabbit Findings (PR #9)
+- **Template Literals**: Replaced string concatenations in cssesc.mjs for better readability
+- **Type Safety**: Changed `any` types to `unknown` in type declarations for better safety
+- **Performance**: Optimized analytics algorithms from O(n²) to O(n) in MockConnector
+- **Error Handling**: Added proper null checks and guard clauses throughout codebase
+- **Test Quality**: Enhanced test assertions and removed unnecessary mocks
+
+### GitHub CLI Integration
+Use `gh` CLI for efficient CodeRabbit review management:
+```bash
+# View PR comments
+gh api repos/owner/repo/pulls/PR_NUMBER/comments
+
+# Reply to specific comment
+gh api repos/owner/repo/pulls/9/comments/COMMENT_ID/replies -X POST --field 'body=Fix summary'
+
+# Check CI status
+gh pr checks
+```
 
 ## Code Standards & Patterns
 

@@ -10,19 +10,15 @@ const mockDb = {
   update: vi.fn(),
 };
 
-// Mock the db module from 'astro:db'
-vi.mock('astro:db', () => ({
-  db: mockDb,
-  Feedback: 'mocked-feedback-table',
-  sql: {
-    count: vi.fn(() => 'count(*)'),
-  },
-}));
+// Note: No vi.mock for 'astro:db' needed since we inject dependencies via constructor
 
 describe('AstroDbConnector', () => {
   let connector: AstroDbConnector;
 
   beforeEach(() => {
+    // Clear mocks before creating new instance to avoid state pollution
+    vi.clearAllMocks();
+    
     // Inject mock dependencies for testing
     connector = new AstroDbConnector({
       db: mockDb,
@@ -32,7 +28,6 @@ describe('AstroDbConnector', () => {
         desc: vi.fn((col) => `desc(${col})`),
       },
     });
-    vi.clearAllMocks();
   });
 
   test('should have correct name', () => {
@@ -63,8 +58,11 @@ describe('AstroDbConnector', () => {
     const result = await connector.store(feedback);
 
     expect(result.success).toBe(true);
-    expect(result.id).toMatch(/^feedback_\d+_[a-z0-9]+$/); // Generated ID pattern
+    expect(result.id).toMatch(/^feedback_[a-f0-9-]+$/); // Generated ID pattern (UUID or timestamp-based)
     expect(mockDb.insert).toHaveBeenCalledWith('mocked-feedback-table');
+    expect(mockDb.insert().values).toHaveBeenCalledWith(
+      expect.objectContaining({ id: expect.any(String) })
+    );
   });
 
   test('should handle database insert errors', async () => {

@@ -6,6 +6,7 @@ settings:
 
 overrides:
   esbuild: '>=0.25.0'
+  cssesc: 3.0.0
 
 importers:
 

@@ -13,6 +13,9 @@ const corsHeaders = {
   "Access-Control-Max-Age": "86400",
 };
 
+// Cache the astro:db import promise to avoid re-importing on every request
+const astroDbImportPromise = import("astro:db").catch(() => undefined);
+
 export const POST: APIRoute = async ({ request }) => {
   // Only allow POST method
   if (request.method !== "POST") {
@@ -60,20 +63,23 @@ export const POST: APIRoute = async ({ request }) => {
     let astrodb = undefined;
     try {
       // Add a timeout to prevent hanging during tests
-      const astroDbPromise = import("astro:db");
       const timeoutPromise = new Promise((_, reject) =>
         setTimeout(() => reject(new Error("Astro DB import timeout")), 2000),
       );
 
       const astroDbModule = await Promise.race([
-        astroDbPromise,
+        astroDbImportPromise,
         timeoutPromise,
       ]);
-      astrodb = {
-        db: (astroDbModule as any).db,
-        Feedback: (astroDbModule as any).Feedback,
-        sql: (astroDbModule as any).sql,
-      };
+      if (astroDbModule) {
+        astrodb = {
+          db: (astroDbModule as any).db,
+          Feedback: (astroDbModule as any).Feedback,
+          sql: (astroDbModule as any).sql,
+        };
+      } else {
+        throw new Error("Astro DB module not available");
+      }
       console.log("Astro DB successfully imported");
     } catch (error) {
       console.log(
@@ -111,6 +117,7 @@ export const POST: APIRoute = async ({ request }) => {
         success: false,
         error: result.error || "Failed to store feedback",
         retryable: result.results.some((r) => r.retryable),
+        id: result.correlationId,
       };
 
       return new Response(JSON.stringify(response), {

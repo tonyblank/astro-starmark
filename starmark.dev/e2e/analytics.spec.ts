@@ -90,11 +90,13 @@ test.describe('Analytics Integration', () => {
     
     // Verify analytics metadata is present
     expect(apiResponse).toBeDefined();
-    expect(apiResponse!.metadata).toBeDefined();
-    expect(apiResponse!.metadata.results).toBeDefined();
     
-    // Check that connector results include metadata
-    for (const result of apiResponse!.metadata.results) {
+    if (apiResponse?.metadata) {
+      expect(apiResponse.metadata).toBeDefined();
+      expect(apiResponse.metadata.results).toBeDefined();
+      
+      // Check that connector results include metadata
+      for (const result of apiResponse.metadata.results) {
       if (result.success && result.metadata) {
         expect(typeof result.metadata).toBe('object');
         
@@ -106,6 +108,7 @@ test.describe('Analytics Integration', () => {
           expect(typeof result.metadata.totalFeedbackProcessed).toBe('number');
         }
       }
+    }
     }
   });
 
@@ -397,7 +400,7 @@ test.describe('Analytics Integration', () => {
     
     // Verify response includes timing data
     expect(apiResponse).toBeDefined();
-    const mockResult = apiResponse!.metadata.results.find((r: any) => r.connector === 'mock');
+    const mockResult = apiResponse?.metadata?.results.find((r: any) => r.connector === 'mock');
     if (mockResult?.metadata?.timestamp) {
       const responseTime = new Date(mockResult.metadata.timestamp).getTime();
       

@@ -7,7 +7,7 @@ describe('CloudflareEnvAdapter', () => {
   beforeEach(() => {
     adapter = new CloudflareEnvAdapter();
     // Reset process.env for each test
-    delete process.env.TEST_VAR;
+    process.env.TEST_VAR = undefined;
   });
 
   test('should get environment variables from process.env when no context provided', () => {

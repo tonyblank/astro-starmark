@@ -20,6 +20,7 @@ async function openModalAndFillForm(page: Page, category: string, comment: strin
     } catch (error) {
       retries--;
       if (retries === 0) throw error;
+      console.warn(`Navigation retry ${4 - retries}/3:`, error);
       await page.waitForTimeout(1000);
     }
   }

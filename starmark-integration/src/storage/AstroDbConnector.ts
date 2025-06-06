@@ -62,7 +62,7 @@ export class AstroDbConnector implements StorageConnector {
 
   async health(): Promise<boolean> {
     try {
-      if (!this.db || !this.Feedback) {
+      if (!this.db || !this.Feedback || !this.sql) {
         return false;
       }
 
@@ -174,7 +174,12 @@ export class AstroDbConnector implements StorageConnector {
   }
 
   private generateId(): string {
-    // Generate a unique ID for the feedback record
-    return `feedback_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    // Generate a unique ID using crypto.randomUUID (Node.js 14.17+)
+    // Fallback to timestamp + random for older Node versions
+    if (typeof crypto !== "undefined" && crypto.randomUUID) {
+      return `feedback_${crypto.randomUUID()}`;
+    }
+    // Fallback for environments without crypto.randomUUID
+    return `feedback_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
   }
 }

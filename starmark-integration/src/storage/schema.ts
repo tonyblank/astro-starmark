@@ -31,8 +31,8 @@ export const FeedbackTableSchema = {
     userAgent: { type: "text", optional: true },
     userId: { type: "text", optional: true },
     userEmail: { type: "text", optional: true },
-    timestamp: { type: "text", notNull: true }, // ISO string
-    createdAt: { type: "date", notNull: true, default: "CURRENT_TIMESTAMP" },
+    timestamp: { type: "text", notNull: true }, // ISO string from client-side (user timezone)
+    createdAt: { type: "date", notNull: true, default: "CURRENT_TIMESTAMP" }, // Server-side insert time
   },
 };
 
@@ -53,8 +53,8 @@ export const FeedbackTableSchema = {
  *     userAgent: column.text({ optional: true }),
  *     userId: column.text({ optional: true }),
  *     userEmail: column.text({ optional: true }),
- *     timestamp: column.text({ notNull: true }),
- *     createdAt: column.date({ notNull: true, default: sql`CURRENT_TIMESTAMP` }),
+ *     timestamp: column.text({ notNull: true }), // ISO string from client-side (user timezone)
+ *     createdAt: column.date({ notNull: true, default: sql`CURRENT_TIMESTAMP` }), // Server-side insert time
  *   }
  * });
  *

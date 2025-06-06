@@ -55,7 +55,7 @@ export const FeedbackSubmissionResponseSchema = z.object({
   message: z.string().optional(),
   error: z.string().optional(),
   retryable: z.boolean().optional(),
-  metadata: z.record(z.any()).optional(),
+  metadata: z.record(z.unknown()).optional(),
 });
 
 export type FeedbackSubmissionResponse = z.infer<
