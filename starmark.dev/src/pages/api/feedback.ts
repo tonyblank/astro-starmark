@@ -2,8 +2,8 @@ import type { APIRoute } from "astro";
 import {
   FeedbackSchema,
   type FeedbackSubmissionResponse,
+  FeedbackHandler,
 } from "starmark-integration";
-import { v4 as uuidv4 } from "uuid";
 
 // CORS headers for the API endpoint
 const corsHeaders = {
@@ -55,21 +55,81 @@ export const POST: APIRoute = async ({ request }) => {
     // Validate feedback data with Zod schema
     const validatedFeedback = FeedbackSchema.parse(feedbackData);
 
-    // For now, just return success (no actual storage in Milestone 4)
-    // In future milestones, this will call connectors to store the feedback
-    console.log("Feedback received:", {
-      page: validatedFeedback.page,
-      category: validatedFeedback.category,
-      comment:
-        validatedFeedback.comment.substring(0, 100) +
-        (validatedFeedback.comment.length > 100 ? "..." : ""),
-      timestamp: validatedFeedback.timestamp,
+    // Create feedback handler with environment-based configuration
+    // Try to dynamically import Astro DB dependencies with timeout
+    let astrodb = undefined;
+    try {
+      // Add a timeout to prevent hanging during tests
+      const astroDbPromise = import("astro:db");
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("Astro DB import timeout")), 2000),
+      );
+
+      const astroDbModule = await Promise.race([
+        astroDbPromise,
+        timeoutPromise,
+      ]);
+      astrodb = {
+        db: (astroDbModule as any).db,
+        Feedback: (astroDbModule as any).Feedback,
+        sql: (astroDbModule as any).sql,
+      };
+      console.log("Astro DB successfully imported");
+    } catch (error) {
+      console.log(
+        "Astro DB not available, will use fallback storage:",
+        (error as Error).message,
+      );
+    }
+
+    const feedbackHandler = await FeedbackHandler.createFromEnvironment({
+      astrodb,
     });
+
+    console.log(
+      "Registered storage connectors:",
+      feedbackHandler.getRegisteredConnectors(),
+    );
+
+    // Process feedback through all available storage connectors
+    const result = await feedbackHandler.processFeedback(validatedFeedback);
+
+    console.log("Feedback processed:", {
+      correlationId: result.correlationId,
+      success: result.success,
+      connectorsUsed: result.results.length,
+      results: result.results.map((r) => ({
+        connector: r.connector,
+        success: r.success,
+        id: r.id,
+        healthy: r.healthy,
+      })),
+    });
+
+    if (!result.success) {
+      const response: FeedbackSubmissionResponse = {
+        success: false,
+        error: result.error || "Failed to store feedback",
+        retryable: result.results.some((r) => r.retryable),
+      };
+
+      return new Response(JSON.stringify(response), {
+        status: 500,
+        headers: {
+          "Content-Type": "application/json",
+          ...corsHeaders,
+        },
+      });
+    }
 
     const response: FeedbackSubmissionResponse = {
       success: true,
-      id: `feedback-${uuidv4()}`,
+      id: result.correlationId,
       message: "Feedback submitted successfully",
+      metadata: {
+        connectorsUsed: result.results.length,
+        results: result.results,
+      },
     };
 
     return new Response(JSON.stringify(response), {

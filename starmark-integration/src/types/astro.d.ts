@@ -10,3 +10,12 @@ declare module "*.astro" {
 
   export type Props = ComponentProps<typeof Component>;
 }
+
+declare module "astro:db" {
+  export const db: any;
+  export const Feedback: any;
+  export const sql: {
+    count: (column?: string) => string;
+    desc: (column: string) => string;
+  };
+}

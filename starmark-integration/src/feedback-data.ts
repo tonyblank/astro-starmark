@@ -29,7 +29,7 @@ export const FeedbackSchema = z.object({
   timestamp: z.string().datetime({
     message: "Timestamp must be a valid ISO datetime",
   }),
-  userAgent: z.string().min(1, "User agent is required"),
+  userAgent: z.string().optional(),
 
   // Optional fields
   highlightedText: z.string().optional(),
@@ -39,6 +39,7 @@ export const FeedbackSchema = z.object({
     .max(100, "Suggested tag must be less than 100 characters")
     .optional(),
   userEmail: z.string().email("Must be a valid email address").optional(),
+  userId: z.string().optional(),
   userName: z
     .string()
     .max(200, "User name must be less than 200 characters")
@@ -54,6 +55,7 @@ export const FeedbackSubmissionResponseSchema = z.object({
   message: z.string().optional(),
   error: z.string().optional(),
   retryable: z.boolean().optional(),
+  metadata: z.record(z.any()).optional(),
 });
 
 export type FeedbackSubmissionResponse = z.infer<

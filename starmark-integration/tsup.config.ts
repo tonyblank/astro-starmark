@@ -9,7 +9,7 @@ export default defineConfig({
   clean: true,
   treeshake: true,
   splitting: false,
-  external: ['astro'],
+  external: ['astro', 'astro:db'],
   bundle: true,
   minify: false, // Keep readable for debugging
 }); 

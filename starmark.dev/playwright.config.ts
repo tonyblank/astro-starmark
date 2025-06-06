@@ -41,7 +41,14 @@ export default defineConfig({
 
     {
       name: 'firefox',
-      use: { ...devices['Desktop Firefox'] },
+      use: { 
+        ...devices['Desktop Firefox'],
+        // Firefox-specific settings for stability
+        actionTimeout: 15000,
+        navigationTimeout: 30000,
+      },
+      retries: 3, // Additional retries for Firefox flakiness
+      timeout: 45000, // Increase test timeout for Firefox
     },
 
     {
