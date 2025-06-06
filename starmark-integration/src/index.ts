@@ -199,5 +199,19 @@ export {
   isValidFeedbackData,
 } from "./feedback-data";
 
+// Re-export storage types and classes
+export {
+  type StorageConnector,
+  type StorageResult,
+  type AnalyticsData,
+} from "./types";
+
+export { StorageRegistry } from "./storage/StorageRegistry";
+export { FeedbackHandler } from "./storage/FeedbackHandler";
+export { LinearConnector } from "./storage/LinearConnector";
+export { AstroDbConnector } from "./storage/AstroDbConnector";
+export { CloudflareEnvAdapter } from "./storage/CloudflareEnvAdapter";
+export { MockConnector } from "./storage/MockConnector";
+
 // Default export for convenience
 export default starmark;

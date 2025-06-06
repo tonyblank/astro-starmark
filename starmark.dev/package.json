@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "astro dev",
     "start": "astro dev",
-    "build": "astro build",
+    "build": "ASTRO_DATABASE_FILE=./.astro/database.db astro build",
     "preview": "astro preview",
     "test": "echo 'No unit tests for starmark.dev - use test:e2e for E2E tests'",
     "test:e2e": "playwright test",
@@ -20,6 +20,7 @@
   },
   "dependencies": {
     "@astrojs/cloudflare": "^12.5.3",
+    "@astrojs/db": "^0.15.0",
     "@astrojs/starlight": "^0.34.3",
     "astro": "^5.8.2",
     "starmark-integration": "workspace:*",

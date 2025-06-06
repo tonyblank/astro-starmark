@@ -35,4 +35,80 @@ export async function renderAstroComponentToString(
 ) {
   const container = await AstroContainer.create();
   return await container.renderToString(Component, options);
+}
+
+/**
+ * Mock Storage Connector for testing
+ */
+export class MockStorageConnector {
+  public name: string;
+  private detectionResult = true;
+  private detectionError: Error | null = null;
+  private storeResults: import('../src/types').StorageResult[] = [];
+  private healthResult = true;
+  private analyticsResult: import('../src/types').AnalyticsData | null = null;
+
+  constructor(name: string) {
+    this.name = name;
+  }
+
+  async store(_feedback: import('../src/types').FeedbackData): Promise<import('../src/types').StorageResult> {
+    if (this.storeResults.length > 0) {
+      const result = this.storeResults.shift();
+      if (!result) {
+        throw new Error('No queued results available');
+      }
+      return result;
+    }
+    return {
+      success: true,
+      id: `${this.name}-${Date.now()}`,
+    };
+  }
+
+  async health(): Promise<boolean> {
+    return this.healthResult;
+  }
+
+  async detect(): Promise<boolean> {
+    if (this.detectionError) {
+      throw this.detectionError;
+    }
+    return this.detectionResult;
+  }
+
+  async getAnalytics?(): Promise<import('../src/types').AnalyticsData> {
+    if (this.analyticsResult) {
+      return this.analyticsResult;
+    }
+    return {
+      totalFeedback: 42,
+      categories: { Typo: 10, Confusing: 15, Other: 17 },
+      pageStats: [
+        { page: '/docs/test', count: 5 },
+        { page: '/docs/example', count: 3 },
+      ],
+    };
+  }
+
+  // Test helper methods
+  setDetectionResult(result: boolean): void {
+    this.detectionResult = result;
+  }
+
+  setDetectionError(error: Error): void {
+    this.detectionError = error;
+  }
+
+  setHealthResult(result: boolean): void {
+    this.healthResult = result;
+  }
+
+  setStoreResult(result: import('../src/types').StorageResult): void {
+    this.storeResults.push(result);
+  }
+
+  setAnalyticsResult(result: import('../src/types').AnalyticsData): void {
+    this.analyticsResult = result;
+  }
 } 

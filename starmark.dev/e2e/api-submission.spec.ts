@@ -10,15 +10,27 @@ import type { Page } from '@playwright/test';
  * Helper function to open feedback modal and fill basic form data
  */
 async function openModalAndFillForm(page: Page, category: string, comment: string, suggestedTag?: string): Promise<void> {
-  await page.goto('/getting-started/quick-start');
-  await page.waitForLoadState('networkidle');
+  // More robust navigation with retries for Firefox
+  let retries = 3;
+  while (retries > 0) {
+    try {
+      await page.goto('/getting-started/quick-start', { waitUntil: 'domcontentloaded' });
+      await page.waitForLoadState('networkidle', { timeout: 10000 });
+      break;
+    } catch (error) {
+      retries--;
+      if (retries === 0) throw error;
+      console.warn(`Navigation retry ${4 - retries}/3:`, error);
+      await page.waitForTimeout(1000);
+    }
+  }
   
   // Wait for scripts to initialize
-  await page.waitForTimeout(500);
+  await page.waitForTimeout(1000);
   
-  // Open modal
+  // Open modal with retries
   const widget = page.getByTestId('feedback-widget');
-  await expect(widget).toBeVisible();
+  await expect(widget).toBeVisible({ timeout: 10000 });
   await widget.click();
   
   // Wait for modal to open and form to be ready

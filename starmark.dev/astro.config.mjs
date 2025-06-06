@@ -2,7 +2,7 @@ import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
 import starmark from 'starmark-integration';
 import cloudflare from '@astrojs/cloudflare';
-
+import db from '@astrojs/db';
 // https://astro.build/config
 export default defineConfig({
   site: 'https://starmark.dev',
@@ -13,6 +13,7 @@ export default defineConfig({
     enabled: process.env.NODE_ENV !== 'test' && !process.env.PLAYWRIGHT_TEST
   },
   integrations: [
+    db(),
     starlight({
       title: 'StarMark',
       description: 'Feedback collection for Astro documentation sites',
@@ -66,8 +67,18 @@ export default defineConfig({
     }
   },
   vite: {
+    resolve: {
+      alias: {
+        'cssesc': new URL('./src/utils/cssesc.mjs', import.meta.url).pathname
+      }
+    },
     ssr: {
-      external: ['node:path', 'node:url'],
+      external: ['node:path', 'node:url', 'astro:db'],
+    },
+    build: {
+      rollupOptions: {
+        external: ['astro:db'],
+      },
     },
   },
   build: {
